@@ -4,9 +4,9 @@ This document specifies the feature set of **CodeAlloy** in the form of agile us
 
 ---
 
-## Epic 0: Base IDE Foundation & CodeAlloy Shell
+## Epic 0: Base IDE Foundation & CodeAlloy Shell `[COMPLETED]`
 
-Before any agent or AI capability can be layered in, CodeAlloy requires a working, branded desktop shell running locally with extension support and build pipelines.
+The CodeAlloy desktop shell is bootstrapped from Code-OSS v1.96.4, branded with the Forge design system, custom `.icns` application bundle, and configured for Open VSX marketplace with working local dev loops.
 
 ### US-0.1: Upstream Code-OSS Base & Patch Orchestration
 * **User Story**: As a core contributor, I want an automated build pipeline that pulls a pinned stable release of Code-OSS (or VSCodium build recipe) and applies CodeAlloy patches cleanly, so that we have a repeatable, clean build foundation without merge chaos.
