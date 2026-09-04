@@ -44,7 +44,7 @@
       }
     ],
     "viewsContainers": {
-      "activitybar": [
+      "auxiliarybar": [
         {
           "id": "codealloy-agent-panel",
           "title": "CodeAlloy Agent",

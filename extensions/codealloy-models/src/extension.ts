@@ -128,9 +128,15 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 	}
 
-	// Auto-open Agent Chat panel by default on startup (Agentic IDE default)
-	const openChatByDefault = async () => {
+	// Auto-setup Agentic IDE layout on startup: Explorer on left, Agent Chat on right
+	const setupAgenticLayout = async () => {
 		try {
+			// Ensure Explorer is active on the left Primary Side Bar
+			await vscode.commands.executeCommand('workbench.view.explorer');
+		} catch {}
+
+		try {
+			// Ensure CodeAlloy Agent is active on the right Secondary Side Bar
 			await vscode.commands.executeCommand('codealloy.agentView.focus');
 		} catch {
 			try {
@@ -139,8 +145,8 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	};
 
-	setTimeout(openChatByDefault, 200);
-	setTimeout(openChatByDefault, 800);
+	setTimeout(setupAgenticLayout, 250);
+	setTimeout(setupAgenticLayout, 900);
 }
 
 async function activateModel(fileName: string): Promise<void> {
