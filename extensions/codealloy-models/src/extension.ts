@@ -1,12 +1,16 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { LocalModelManager, InstalledModel } from './modelManager';
 import { CURATED_MODELS, CuratedModel } from './modelCatalog';
+import { LlamaServerService } from './llamaServerService';
 
 let modelStatusBarItem: vscode.StatusBarItem;
 let modelManager: LocalModelManager;
+let llamaServer: LlamaServerService;
 
 export function activate(context: vscode.ExtensionContext) {
 	modelManager = new LocalModelManager();
+	llamaServer = LlamaServerService.getInstance();
 
 	// 1. Create Model Selector Status Bar Item
 	modelStatusBarItem = vscode.window.createStatusBarItem(
@@ -35,7 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand('codealloy.addLocalModel', async () => {
 			const added = await modelManager.addModelFromDisk();
 			if (added) {
-				updateStatusBar();
+				await activateModel(added);
 				vscode.window.showInformationMessage(`CodeAlloy: Model "${added}" added and activated.`);
 			}
 		})
@@ -70,21 +74,53 @@ export function activate(context: vscode.ExtensionContext) {
 		})
 	);
 
-	// Initial status bar setup
+	// Initial status bar setup & auto-load active model
 	updateStatusBar();
 	modelStatusBarItem.show();
+
+	const active = modelManager.getActiveModel();
+	if (active) {
+		activateModel(active).catch(err => {
+			console.error('[CodeAlloy] Failed to auto-load active model:', err);
+		});
+	}
+}
+
+async function activateModel(fileName: string): Promise<void> {
+	await modelManager.setActiveModel(fileName);
+	const fullPath = path.join(modelManager.getModelsDirectory(), fileName);
+
+	modelStatusBarItem.text = `$(sync~spin) Loading ${fileName}...`;
+	modelStatusBarItem.tooltip = `Loading ${fileName} into Apple Silicon Metal GPU memory...`;
+
+	const started = await llamaServer.start(fullPath);
+	if (started) {
+		updateStatusBar();
+		vscode.window.showInformationMessage(`CodeAlloy: Model "${fileName}" loaded into GPU memory (Metal active).`);
+	} else {
+		updateStatusBar();
+		vscode.window.showWarningMessage(`CodeAlloy: Selected "${fileName}" (inference engine offline).`);
+	}
 }
 
 function updateStatusBar(): void {
 	const active = modelManager.getActiveModel();
 	const installed = modelManager.listInstalledModels();
+	const serverStatus = llamaServer.getStatus();
 
 	if (active) {
 		const matched = installed.find(m => m.fileName.toLowerCase() === active.toLowerCase());
 		const displayName = matched ? matched.name : active;
-		modelStatusBarItem.text = `$(flame) ${displayName}`;
-		modelStatusBarItem.tooltip = `CodeAlloy Active Model: ${displayName} (${matched ? matched.sizeFormatted : 'Local'})\nClick to switch models or download new models`;
-		modelStatusBarItem.backgroundColor = undefined;
+
+		if (serverStatus.running) {
+			modelStatusBarItem.text = `$(flame) ${displayName}`;
+			modelStatusBarItem.tooltip = `CodeAlloy Active Model: ${displayName}\nEngine: Embedded llama.cpp (Metal GPU)\nEndpoint: ${llamaServer.getEndpointUrl()}\nClick to switch models`;
+			modelStatusBarItem.backgroundColor = undefined;
+		} else {
+			modelStatusBarItem.text = `$(flame) ${displayName} (Standby)`;
+			modelStatusBarItem.tooltip = `CodeAlloy Model: ${displayName} (Ready to load on prompt)\nClick to change models`;
+			modelStatusBarItem.backgroundColor = undefined;
+		}
 	} else {
 		modelStatusBarItem.text = `$(flame) CodeAlloy: No Model`;
 		modelStatusBarItem.tooltip = 'Click to select or download a local coding model';
@@ -174,15 +210,13 @@ async function showModelPicker(): Promise<void> {
 	if (!selected) return;
 
 	if (selected.action === 'select' && selected.fileName) {
-		await modelManager.setActiveModel(selected.fileName);
-		updateStatusBar();
-		vscode.window.showInformationMessage(`CodeAlloy: Active model set to "${selected.label.replace('$(check) ', '')}"`);
+		await activateModel(selected.fileName);
 	} else if (selected.action === 'download' && selected.curatedModel) {
 		await downloadModelWithProgress(selected.curatedModel);
 	} else if (selected.action === 'add-file') {
 		const added = await modelManager.addModelFromDisk();
 		if (added) {
-			updateStatusBar();
+			await activateModel(added);
 			vscode.window.showInformationMessage(`CodeAlloy: Added and activated "${added}"`);
 		}
 	} else if (selected.action === 'open-folder') {
@@ -210,9 +244,9 @@ async function downloadModelWithProgress(model: CuratedModel): Promise<void> {
 					}
 				});
 
-				updateStatusBar();
+				await activateModel(model.fileName);
 				vscode.window.showInformationMessage(
-					`CodeAlloy: "${model.displayName}" downloaded and activated successfully!`,
+					`CodeAlloy: "${model.displayName}" downloaded and activated in GPU memory!`,
 					'OK'
 				);
 			} catch (err: any) {
@@ -223,6 +257,9 @@ async function downloadModelWithProgress(model: CuratedModel): Promise<void> {
 }
 
 export function deactivate() {
+	if (llamaServer) {
+		llamaServer.stop();
+	}
 	if (modelStatusBarItem) {
 		modelStatusBarItem.dispose();
 	}

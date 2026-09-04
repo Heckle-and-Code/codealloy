@@ -97,6 +97,51 @@ for patchfile in "${ROOT_DIR}/patches"/*.patch; do
     fi
 done
 
+# Setup embedded llama.cpp inference engine
+echo ""
+echo "⚙️ Setting up embedded llama.cpp native inference engine..."
+mkdir -p "${HOME}/.codealloy/bin"
+mkdir -p "${HOME}/.codealloy/models"
+
+LLAMA_TAG="b10798"
+LLAMA_URL=""
+LLAMA_ARCHIVE_TYPE="tar"
+
+OS_NAME="$(uname -s | tr '[:upper:]' '[:lower:]')"
+ARCH_NAME="$(uname -m)"
+
+if [ "${OS_NAME}" = "darwin" ]; then
+    if [ "${ARCH_NAME}" = "arm64" ]; then
+        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/llama-${LLAMA_TAG}-bin-macos-arm64.tar.gz"
+    else
+        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/llama-${LLAMA_TAG}-bin-macos-x64.tar.gz"
+    fi
+elif [ "${OS_NAME}" = "linux" ]; then
+    if [ "${ARCH_NAME}" = "aarch64" ] || [ "${ARCH_NAME}" = "arm64" ]; then
+        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/llama-${LLAMA_TAG}-bin-ubuntu-arm64.tar.gz"
+    else
+        LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/llama-${LLAMA_TAG}-bin-ubuntu-x64.tar.gz"
+    fi
+elif [[ "${OS_NAME}" == *"mingw"* ]] || [[ "${OS_NAME}" == *"msys"* ]] || [[ "${OS_NAME}" == *"cygwin"* ]]; then
+    LLAMA_URL="https://github.com/ggml-org/llama.cpp/releases/download/${LLAMA_TAG}/llama-${LLAMA_TAG}-bin-win-avx2-x64.zip"
+    LLAMA_ARCHIVE_TYPE="zip"
+fi
+
+if [ ! -f "${HOME}/.codealloy/bin/llama-server" ] && [ ! -f "${HOME}/.codealloy/bin/llama-server.exe" ]; then
+    if [ -n "${LLAMA_URL}" ]; then
+        echo "  Downloading native llama.cpp runner for ${OS_NAME} (${ARCH_NAME})..."
+        if [ "${LLAMA_ARCHIVE_TYPE}" = "zip" ]; then
+            curl -sL "${LLAMA_URL}" -o /tmp/llama.zip && unzip -q -o /tmp/llama.zip -d "${HOME}/.codealloy/bin" && rm -f /tmp/llama.zip
+        else
+            curl -sL "${LLAMA_URL}" | tar -xzf - -C "${HOME}/.codealloy/bin" --strip-components=1
+        fi
+        chmod +x "${HOME}/.codealloy/bin/llama-server"* 2>/dev/null || true
+        echo "  ✓ Embedded inference engine installed in ~/.codealloy/bin"
+    fi
+else
+    echo "  ✓ Embedded inference engine already present in ~/.codealloy/bin"
+fi
+
 # 4. Patch native spdlog for macOS Xcode 16 Clang consteval compatibility
 echo ""
 echo "🔧 Applying platform compatibility patches..."
