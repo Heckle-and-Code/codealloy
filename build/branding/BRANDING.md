@@ -4,21 +4,35 @@
 
 ---
 
-## 🎨 Color Palette & Visual Philosophy
+## 🎨 The Blacksmith & Forge Philosophy
 
-CodeAlloy's design balances the heat of the forge (developer creation) with the precision of tempered titanium and electric intelligence.
+CodeAlloy's design is deeply rooted in the art of the **blacksmith**, the **anvil**, and the **furnace**:
+* **The Anvil**: The unyielding foundation where raw ideas meet deliberate force. The anvil represents developer intent—solid, grounded, and directing the strike.
+* **The Forging Hammer**: The active execution of tools and code synthesis. Each turn is a hammer strike on glowing steel.
+* **The Molten Ingot & Alloys**: Two metals (developer craft + open model weights) folding and fusing under intense heat to create a resilient composite structure—stronger than pure carbon steel alone.
+* **The Sparks & Embers**: The eruption of creative energy at the point of impact.
 
-### 1. Brand Color Tokens
+---
+
+## 🎨 Color Palette & Forge Tokens
 
 | Token | Hex | Role | Usage |
 | :--- | :--- | :--- | :--- |
-| `--alloy-core-primary` | `#FF7700` | Molten Amber (Hero) | Primary branding, buttons, active focus rings, agent thinking pulses. |
-| `--alloy-core-highlight` | `#FFB703` | Radiant Gold | Secondary highlights, warnings, key badges. |
-| `--alloy-intel-cyan` | `#00E5FF` | Electric Cyan | AI state active, model connection indicator, streaming status. |
-| `--alloy-titanium-deep` | `#121316` | Deep Carbon Void | Window background, status bar, command palette backdrop. |
-| `--alloy-titanium-card` | `#1C1E24` | Brushed Titanium | Sidebar background, modal cards, input containers. |
-| `--alloy-titanium-border`| `#2C303B` | Tempered Seam | Panel dividers, subtle borders, inactive toggles. |
-| `--alloy-forge-green` | `#10B981` | Quenched Emerald | Checkpoint saved, tests passing, rollback completed. |
+| `--alloy-forge-white-hot`| `#FFF5B8` | Incandescent Strike | Impact center, active highlight, maximum heat. |
+| `--alloy-forge-amber` | `#FF8C00` | Molten Ingot | Primary branding, buttons, active focus rings, agent thinking pulses. |
+| `--alloy-forge-ember` | `#D9381E` | Fiery Cinder | Warnings, destructive alerts, heat dissipation. |
+| `--alloy-damascus-dark` | `#121316` | Wrought Iron Bed | Window background, status bar, command palette backdrop. |
+| `--alloy-damascus-surface`| `#1C1E24` | Folded Steel Core | Sidebar background, modal cards, input containers. |
+| `--alloy-damascus-border` | `#2C303B` | Hammered Seam | Panel dividers, subtle borders, inactive toggles. |
+| `--alloy-quench-emerald` | `#10B981` | Tempered Steel | Checkpoint saved, tests passing, rollback completed. |
+
+---
+
+## 🛡️ Assets
+
+* **App Icon**: `build/branding/icon.png` (Square app badge with Damascus pattern, heavy blacksmith anvil, hammer strike, and incandescent code ingot).
+* **Cinematic Showcase**: `build/branding/forge_banner.png` (Full forge environment with glowing anvil and gear crest).
+* **Vector Mark**: `build/branding/logo.svg` (Clean scalable SVG for headers, Welcome screen, and splash).
 
 ---
 

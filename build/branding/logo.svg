@@ -1,50 +1,83 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
   <defs>
-    <radialGradient id="moltenCore" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#FFF0B3" />
-      <stop offset="35%" stop-color="#FF9E00" />
-      <stop offset="75%" stop-color="#FF5500" />
-      <stop offset="100%" stop-color="#B82800" />
+    <radialGradient id="forgeHeat" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="25%" stop-color="#FFF275" />
+      <stop offset="55%" stop-color="#FF7700" />
+      <stop offset="85%" stop-color="#CC2B00" />
+      <stop offset="100%" stop-color="#3D0B00" stop-opacity="0" />
     </radialGradient>
-    <linearGradient id="titaniumLight" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4B5162" />
-      <stop offset="50%" stop-color="#2D313B" />
-      <stop offset="100%" stop-color="#1A1D24" />
+    <linearGradient id="damascusIron" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A4E5A" />
+      <stop offset="40%" stop-color="#2D3039" />
+      <stop offset="70%" stop-color="#1E2026" />
+      <stop offset="100%" stop-color="#141519" />
     </linearGradient>
-    <linearGradient id="titaniumDark" x1="100%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#252932" />
-      <stop offset="100%" stop-color="#0E1014" />
+    <linearGradient id="hammerSteel" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#686F80" />
+      <stop offset="50%" stop-color="#3A3E48" />
+      <stop offset="100%" stop-color="#1F2127" />
     </linearGradient>
-    <linearGradient id="cyanGlow" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#00E5FF" />
-      <stop offset="100%" stop-color="#0099FF" />
+    <linearGradient id="woodHandle" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5A2B" />
+      <stop offset="100%" stop-color="#4A2E12" />
     </linearGradient>
-    <filter id="coreGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="12" result="blur" />
+    <filter id="sparksGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
 
-  <!-- Background Shield / Squircle -->
+  <!-- Dark Damascus Squircle Badge -->
   <rect width="512" height="512" rx="112" fill="#121316" />
-  <rect x="8" y="8" width="496" height="496" rx="104" fill="none" stroke="#252932" stroke-width="4" />
+  <rect x="10" y="10" width="492" height="492" rx="102" fill="none" stroke="#252830" stroke-width="4" />
+  
+  <!-- Subtle Damascus Wave Grooves in Background -->
+  <path d="M 30,120 Q 140,90 256,120 T 482,120" stroke="#1A1C22" stroke-width="3" fill="none" />
+  <path d="M 30,220 Q 140,190 256,220 T 482,220" stroke="#1A1C22" stroke-width="3" fill="none" />
+  <path d="M 30,320 Q 140,290 256,320 T 482,320" stroke="#1A1C22" stroke-width="3" fill="none" />
+  <path d="M 30,420 Q 140,390 256,420 T 482,420" stroke="#1A1C22" stroke-width="3" fill="none" />
 
-  <!-- Molten Core (Radiant Heat) -->
-  <polygon points="256,120 380,336 132,336" fill="url(#moltenCore)" filter="url(#coreGlow)" opacity="0.95" />
+  <!-- The Anvil (Heavy Forged Iron Silhouette) -->
+  <!-- Base Feet -->
+  <path d="M 120,430 L 392,430 L 360,370 L 310,340 L 202,340 L 152,370 Z" 
+        fill="url(#damascusIron)" stroke="#3E4350" stroke-width="3" />
+  <!-- Waist & Horn & Heel -->
+  <path d="M 202,340 C 202,300 180,260 160,250 L 70,250 C 110,230 140,220 180,220 L 390,220 L 410,250 L 340,250 C 320,260 310,300 310,340 Z" 
+        fill="url(#damascusIron)" stroke="#525869" stroke-width="3" />
 
-  <!-- Outer Alloy Facet (C-Facet) -->
-  <path d="M 180,96 L 332,96 L 416,240 L 372,316 L 320,316 L 380,240 L 312,144 L 200,144 L 140,248 L 200,352 L 312,352 L 340,400 L 180,400 L 96,256 Z" 
-        fill="url(#titaniumLight)" stroke="#5B6275" stroke-width="3" />
+  <!-- Molten Heat Glow Radiating from Anvil Face -->
+  <circle cx="270" cy="210" r="90" fill="url(#forgeHeat)" filter="url(#sparksGlow)" opacity="0.9" />
 
-  <!-- Interlocking Anvil A-Facet -->
-  <path d="M 256,160 L 348,320 L 296,320 L 276,280 L 236,280 L 216,320 L 164,320 Z M 256,230 L 244,256 L 268,256 Z" 
-        fill="url(#titaniumDark)" stroke="#3A3F4D" stroke-width="3" />
+  <!-- Glowing Ingot on Anvil Face -->
+  <rect x="200" y="194" width="140" height="36" rx="8" fill="#FF8C00" stroke="#FFF5B8" stroke-width="3" />
+  <rect x="210" y="200" width="120" height="24" rx="4" fill="#FFF275" />
 
-  <!-- Cyan Circuit Accent Lines -->
-  <path d="M 140,248 L 100,248 M 380,240 L 420,240 M 256,120 L 256,80 M 200,400 L 256,400 L 256,432" 
-        fill="none" stroke="url(#cyanGlow)" stroke-width="6" stroke-linecap="round" />
-  <circle cx="100" cy="248" r="5" fill="#00E5FF" />
-  <circle cx="420" cy="240" r="5" fill="#00E5FF" />
-  <circle cx="256" cy="80" r="5" fill="#00E5FF" />
-  <circle cx="256" cy="432" r="5" fill="#00E5FF" />
+  <!-- Code Symbol { } Engraved in Molten Ingot -->
+  <text x="270" y="218" font-family="-apple-system, BlinkMacSystemFont, monospace" font-size="20" font-weight="900" fill="#B32400" text-anchor="middle">{ ⚡ }</text>
+
+  <!-- The Blacksmith Sledgehammer at Strike Point -->
+  <!-- Wooden Handle (Angled into strike) -->
+  <rect x="300" y="80" width="22" height="120" rx="6" transform="rotate(35 300 80)" fill="url(#woodHandle)" stroke="#261505" stroke-width="2" />
+  <!-- Heavy Steel Hammer Head -->
+  <rect x="240" y="140" width="70" height="48" rx="8" transform="rotate(35 240 140)" fill="url(#hammerSteel)" stroke="#5D6475" stroke-width="3" />
+  <!-- Striking Face Crown -->
+  <line x1="242" y1="184" x2="268" y2="198" stroke="#FFF7C2" stroke-width="5" stroke-linecap="round" />
+
+  <!-- Flying Sparks / Embers of the Strike -->
+  <g filter="url(#sparksGlow)" stroke="#FFB703" stroke-linecap="round">
+    <line x1="255" y1="190" x2="210" y2="140" stroke-width="3" />
+    <line x1="265" y1="185" x2="250" y2="110" stroke-width="3.5" />
+    <line x1="275" y1="185" x2="310" y2="120" stroke-width="3" />
+    <line x1="280" y1="195" x2="350" y2="160" stroke-width="2.5" />
+    <line x1="260" y1="188" x2="180" y2="180" stroke-width="3" />
+    <circle cx="210" cy="138" r="3" fill="#FFFFFF" />
+    <circle cx="248" cy="108" r="3.5" fill="#FFFFFF" />
+    <circle cx="312" cy="118" r="3" fill="#FFFFFF" />
+    <circle cx="352" cy="158" r="2.5" fill="#FFFFFF" />
+    <circle cx="178" cy="178" r="3" fill="#FFFFFF" />
+    <circle cx="230" cy="160" r="2" fill="#FF5500" />
+    <circle cx="290" cy="150" r="2" fill="#FF5500" />
+    <circle cx="200" cy="120" r="2" fill="#FF8C00" />
+  </g>
 </svg>
