@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
+import * as https from 'https';
+import { URL } from 'url';
 import * as path from 'path';
 import * as fs from 'fs';
 import { LocalModelManager } from './modelManager';
@@ -99,12 +101,19 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 		const activeModel = this._modelManager.getActiveModel();
 		const serverStatus = this._llamaServer.getStatus();
+		const config = vscode.workspace.getConfiguration('codealloy');
+		const provider = config.get<string>('inferenceProvider', 'embedded');
+		const externalEndpoint = config.get<string>('externalEndpoint', 'http://127.0.0.1:11434');
+
+		const isRunning = provider === 'embedded' ? serverStatus.running : true;
+		const endpointUrl = provider === 'embedded' ? this._llamaServer.getEndpointUrl() : externalEndpoint;
 
 		this._view.webview.postMessage({
 			type: 'syncState',
 			activeModel: activeModel || null,
-			serverRunning: serverStatus.running,
-			endpoint: this._llamaServer.getEndpointUrl(),
+			serverRunning: isRunning,
+			provider: provider,
+			endpoint: endpointUrl,
 			autonomyLevel: this._autonomyLevel,
 			messages: this._messages
 		});
@@ -332,35 +341,42 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			});
 		}
 
-		// 3. Ensure local inference engine is running
-		let serverStatus = this._llamaServer.getStatus();
-		if (!serverStatus.running) {
-			const fullPath = path.join(this._modelManager.getModelsDirectory(), activeModel);
-			this._outputChannel.appendLine(`[AgentChat] Starting inference engine: ${fullPath}`);
+		// 3. Ensure inference engine is available based on provider
+		const config = vscode.workspace.getConfiguration('codealloy');
+		const provider = config.get<string>('inferenceProvider', 'embedded');
+		const externalEndpoint = config.get<string>('externalEndpoint', 'http://127.0.0.1:11434');
 
-			if (this._view) {
-				this._view.webview.postMessage({
-					type: 'streamChunk',
-					assistantMsgId,
-					chunk: `*(Igniting Apple Silicon Metal GPU engine for "${activeModel}"...)*\n\n`
-				});
-			}
+		if (provider === 'embedded') {
+			let serverStatus = this._llamaServer.getStatus();
+			if (!serverStatus.running) {
+				const fullPath = path.join(this._modelManager.getModelsDirectory(), activeModel);
+				this._outputChannel.appendLine(`[AgentChat] Starting embedded inference engine: ${fullPath}`);
 
-			const started = await this._llamaServer.start(fullPath);
-			if (!started) {
-				this._outputChannel.appendLine(`[AgentChat Error] Failed to start engine for ${activeModel}`);
-				assistantMsg.content = `*(Failed to start inference engine for "${activeModel}". Please check Output > CodeAlloy Inference Engine for details.)*`;
 				if (this._view) {
 					this._view.webview.postMessage({
-						type: 'streamEnd',
+						type: 'streamChunk',
 						assistantMsgId,
-						fullContent: assistantMsg.content
+						chunk: `*(Igniting Apple Silicon Metal GPU engine for "${activeModel}"...)*\n\n`
 					});
 				}
-				return;
+
+				const started = await this._llamaServer.start(fullPath);
+				if (!started) {
+					this._outputChannel.appendLine(`[AgentChat Error] Failed to start engine for ${activeModel}`);
+					assistantMsg.content = `*(Failed to start inference engine for "${activeModel}". Please check Output > CodeAlloy Inference Engine for details.)*`;
+					if (this._view) {
+						this._view.webview.postMessage({
+							type: 'streamEnd',
+							assistantMsgId,
+							fullContent: assistantMsg.content
+						});
+					}
+					return;
+				}
+				this.syncState();
 			}
-			this.syncState();
-			serverStatus = this._llamaServer.getStatus();
+		} else {
+			this._outputChannel.appendLine(`[AgentChat] Using external provider at ${externalEndpoint} for model: ${activeModel}`);
 		}
 
 		// 4. Prepare conversation context for /v1/chat/completions
@@ -418,20 +434,53 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			temperature: 0.2
 		});
 
-		const currentPort = this._llamaServer.getStatus().port || 51434;
-		const reqOptions: http.RequestOptions = {
-			hostname: '127.0.0.1',
-			port: currentPort,
-			path: '/v1/chat/completions',
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Content-Length': Buffer.byteLength(requestBody)
+		let isHttps = false;
+		let reqOptions: http.RequestOptions;
+
+		if (provider === 'embedded') {
+			const currentPort = this._llamaServer.getStatus().port || 51434;
+			reqOptions = {
+				hostname: '127.0.0.1',
+				port: currentPort,
+				path: '/v1/chat/completions',
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Content-Length': Buffer.byteLength(requestBody)
+				}
+			};
+		} else {
+			try {
+				const parsed = new URL(externalEndpoint);
+				isHttps = parsed.protocol === 'https:';
+				const port = parsed.port ? parseInt(parsed.port, 10) : (isHttps ? 443 : 80);
+				const basePath = parsed.pathname.replace(/\/+$/, '');
+				reqOptions = {
+					hostname: parsed.hostname,
+					port,
+					path: `${basePath}/v1/chat/completions`,
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Content-Length': Buffer.byteLength(requestBody)
+					}
+				};
+			} catch (e: any) {
+				assistantMsg.content = `*(Invalid external endpoint URL: "${externalEndpoint}")*`;
+				if (this._view) {
+					this._view.webview.postMessage({
+						type: 'streamEnd',
+						assistantMsgId,
+						fullContent: assistantMsg.content
+					});
+				}
+				return;
 			}
-		};
+		}
 
 		await new Promise<void>((resolve) => {
-			const req = http.request(reqOptions, (res) => {
+			const client = isHttps ? https : http;
+			const req = client.request(reqOptions, (res) => {
 				let buffer = '';
 
 				res.on('data', (chunk: Buffer) => {

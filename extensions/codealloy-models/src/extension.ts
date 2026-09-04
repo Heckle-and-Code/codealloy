@@ -4,6 +4,8 @@ import { LocalModelManager, InstalledModel } from './modelManager';
 import { CURATED_MODELS, CuratedModel } from './modelCatalog';
 import { LlamaServerService } from './llamaServerService';
 import { AgentChatViewProvider } from './agentChatViewProvider';
+import { HardwareProber } from './hardwareProber';
+import { OllamaService, DiscoveredModel } from './ollamaService';
 
 let modelStatusBarItem: vscode.StatusBarItem;
 let chatStatusBarItem: vscode.StatusBarItem;
@@ -14,6 +16,9 @@ let chatProvider: AgentChatViewProvider;
 export function activate(context: vscode.ExtensionContext) {
 	modelManager = new LocalModelManager();
 	llamaServer = LlamaServerService.getInstance();
+
+	const hw = HardwareProber.getHardwareInfo();
+	console.log(`[CodeAlloy] Hardware Detected: ${hw.cpuModel}, ${hw.memoryDescription}, recommended size: ${hw.recommendedModelSize}`);
 
 	// 1. Create Model Selector & Chat Status Bar Items
 	modelStatusBarItem = vscode.window.createStatusBarItem(
@@ -49,6 +54,12 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand('codealloy.selectModel', async () => {
 			await showModelPicker();
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.switchProvider', async () => {
+			await switchInferenceProvider();
 		})
 	);
 
@@ -149,40 +160,129 @@ export function activate(context: vscode.ExtensionContext) {
 	setTimeout(setupAgenticLayout, 900);
 }
 
-async function activateModel(fileName: string): Promise<void> {
-	await modelManager.setActiveModel(fileName);
-	const fullPath = path.join(modelManager.getModelsDirectory(), fileName);
+async function switchInferenceProvider(): Promise<void> {
+	const config = vscode.workspace.getConfiguration('codealloy');
+	const currentProvider = config.get<string>('inferenceProvider', 'embedded');
+	const currentEndpoint = config.get<string>('externalEndpoint', 'http://127.0.0.1:11434');
 
-	modelStatusBarItem.text = `$(sync~spin) Loading ${fileName}...`;
-	modelStatusBarItem.tooltip = `Loading ${fileName} into Apple Silicon Metal GPU memory...`;
+	const choice = await vscode.window.showQuickPick([
+		{
+			label: `${currentProvider === 'embedded' ? '$(check) ' : ''}Embedded Local Engine (llama.cpp)`,
+			description: 'Offline, private, Metal GPU accelerated on Apple Silicon',
+			provider: 'embedded'
+		},
+		{
+			label: `${currentProvider === 'external' ? '$(check) ' : ''}External Endpoint (Ollama / vLLM / LM Studio / Remote Cloud GPU)`,
+			description: currentEndpoint,
+			provider: 'external'
+		}
+	], {
+		placeHolder: 'Select active inference engine provider for CodeAlloy'
+	});
 
-	const started = await llamaServer.start(fullPath);
-	if (started) {
-		updateStatusBar();
-		chatProvider.syncState();
+	if (!choice) return;
+
+	if (choice.provider === 'external') {
+		const newEndpoint = await vscode.window.showInputBox({
+			prompt: 'Enter external inference provider endpoint URL (e.g. Ollama, vLLM, LM Studio)',
+			value: currentEndpoint,
+			ignoreFocusOut: true
+		});
+		if (!newEndpoint) return;
+
+		await config.update('externalEndpoint', newEndpoint.trim(), vscode.ConfigurationTarget.Global);
+		await config.update('inferenceProvider', 'external', vscode.ConfigurationTarget.Global);
+
+		// Stop embedded llamaServer to conserve local GPU memory
+		llamaServer.stop();
+
+		// Probe external endpoint
+		const discovery = await OllamaService.discoverModels(newEndpoint.trim());
+		if (discovery.available && discovery.models.length > 0) {
+			vscode.window.showInformationMessage(`CodeAlloy: Connected to ${discovery.provider} endpoint (${discovery.models.length} models discovered).`);
+			await activateModel(discovery.models[0].name);
+		} else {
+			vscode.window.showWarningMessage(`CodeAlloy: External endpoint set to ${newEndpoint}, but no models currently reachable.`);
+		}
 	} else {
-		updateStatusBar();
-		chatProvider.syncState();
-		vscode.window.showWarningMessage(`CodeAlloy: Selected "${fileName}" (inference engine offline).`);
+		await config.update('inferenceProvider', 'embedded', vscode.ConfigurationTarget.Global);
+		const installed = modelManager.listInstalledModels();
+		if (installed.length > 0) {
+			await activateModel(installed[0].fileName);
+		}
+		vscode.window.showInformationMessage('CodeAlloy: Switched to Embedded Local Engine (Metal GPU).');
 	}
+
+	updateStatusBar();
+	chatProvider.syncState();
+}
+
+async function activateModel(fileName: string, curatedInfo?: CuratedModel): Promise<void> {
+	const config = vscode.workspace.getConfiguration('codealloy');
+	const provider = config.get<string>('inferenceProvider', 'embedded');
+
+	// Memory safety check for embedded local models (US-1.4 / AC 1.4.3)
+	if (provider === 'embedded') {
+		const installed = modelManager.listInstalledModels();
+		const matched = installed.find(m => m.fileName.toLowerCase() === fileName.toLowerCase());
+		const matchedCurated = curatedInfo || matched?.curatedInfo || CURATED_MODELS.find(c => c.fileName.toLowerCase() === fileName.toLowerCase());
+
+		const safety = HardwareProber.checkMemorySafety(
+			matched ? matched.name : fileName,
+			matchedCurated?.recommendedRamGb,
+			matched?.sizeBytes || matchedCurated?.fileSizeBytes
+		);
+
+		if (!safety.safe && safety.warning) {
+			const choice = await vscode.window.showWarningMessage(
+				safety.warning,
+				{ modal: true },
+				'Load Model Anyway'
+			);
+			if (choice !== 'Load Model Anyway') {
+				return;
+			}
+		}
+	}
+
+	await modelManager.setActiveModel(fileName);
+
+	if (provider === 'embedded') {
+		const fullPath = path.join(modelManager.getModelsDirectory(), fileName);
+		modelStatusBarItem.text = `$(sync~spin) Loading ${fileName}...`;
+		modelStatusBarItem.tooltip = `Loading ${fileName} into Apple Silicon Metal GPU memory...`;
+
+		const started = await llamaServer.start(fullPath);
+		if (!started) {
+			vscode.window.showWarningMessage(`CodeAlloy: Selected "${fileName}" (inference engine offline).`);
+		}
+	}
+
+	updateStatusBar();
+	chatProvider.syncState();
 }
 
 function updateStatusBar(): void {
 	const active = modelManager.getActiveModel();
 	const installed = modelManager.listInstalledModels();
 	const serverStatus = llamaServer.getStatus();
+	const config = vscode.workspace.getConfiguration('codealloy');
+	const provider = config.get<string>('inferenceProvider', 'embedded');
+	const externalEndpoint = config.get<string>('externalEndpoint', 'http://127.0.0.1:11434');
+	const hw = HardwareProber.getHardwareInfo();
 
 	if (active) {
 		const matched = installed.find(m => m.fileName.toLowerCase() === active.toLowerCase());
 		const displayName = matched ? matched.name : active;
+		const providerLabel = provider === 'embedded' ? 'Metal GPU' : 'External';
 
-		if (serverStatus.running) {
-			modelStatusBarItem.text = `$(flame) ${displayName}`;
-			modelStatusBarItem.tooltip = `CodeAlloy Active Model: ${displayName}\nEngine: Embedded llama.cpp (Metal GPU)\nEndpoint: ${llamaServer.getEndpointUrl()}\nClick to switch models`;
+		if (serverStatus.running || provider === 'external') {
+			modelStatusBarItem.text = `$(flame) ${displayName} (${providerLabel})`;
+			modelStatusBarItem.tooltip = `CodeAlloy Active Model: ${displayName}\nProvider: ${provider === 'embedded' ? 'Embedded llama.cpp (Metal GPU)' : `External (${externalEndpoint})`}\nHardware: ${hw.memoryDescription}\nClick to switch models or provider`;
 			modelStatusBarItem.backgroundColor = undefined;
 		} else {
 			modelStatusBarItem.text = `$(flame) ${displayName} (Standby)`;
-			modelStatusBarItem.tooltip = `CodeAlloy Model: ${displayName} (Ready to load on prompt)\nClick to change models`;
+			modelStatusBarItem.tooltip = `CodeAlloy Model: ${displayName} (Ready to load on prompt)\nProvider: Embedded llama.cpp\nClick to change models`;
 			modelStatusBarItem.backgroundColor = undefined;
 		}
 	} else {
@@ -195,16 +295,64 @@ function updateStatusBar(): void {
 async function showModelPicker(): Promise<void> {
 	const installed = modelManager.listInstalledModels();
 	const active = modelManager.getActiveModel();
+	const config = vscode.workspace.getConfiguration('codealloy');
+	const provider = config.get<string>('inferenceProvider', 'embedded');
+	const externalEndpoint = config.get<string>('externalEndpoint', 'http://127.0.0.1:11434');
+	const hw = HardwareProber.getHardwareInfo();
 
 	interface ModelQuickPickItem extends vscode.QuickPickItem {
-		action: 'select' | 'download' | 'add-file' | 'open-folder';
+		action: 'select' | 'download' | 'add-file' | 'open-folder' | 'switch-provider';
 		fileName?: string;
 		curatedModel?: CuratedModel;
 	}
 
 	const items: ModelQuickPickItem[] = [];
 
-	// Section 1: Installed Models
+	// Section 0: Provider Switcher
+	items.push({
+		label: `$(server-process) Inference Provider: ${provider === 'embedded' ? 'Embedded Engine (Metal GPU)' : `External Endpoint (${externalEndpoint})`}`,
+		description: 'Click to toggle between embedded llama.cpp and external Ollama/vLLM',
+		action: 'switch-provider'
+	});
+
+	// Section 1: External Discovered Models (if in external mode)
+	if (provider === 'external') {
+		items.push({
+			label: `EXTERNAL MODELS (${externalEndpoint})`,
+			kind: vscode.QuickPickItemKind.Separator,
+			action: 'select'
+		});
+
+		try {
+			const discovery = await OllamaService.discoverModels(externalEndpoint);
+			if (discovery.available && discovery.models.length > 0) {
+				for (const m of discovery.models) {
+					const isActive = active && m.name.toLowerCase() === active.toLowerCase();
+					items.push({
+						label: `${isActive ? '$(check) ' : ''}${m.name}`,
+						description: m.parameterSize ? `${m.parameterSize} • ${m.quantization || ''}` : m.tag,
+						detail: `Provider: ${discovery.provider} at ${externalEndpoint}`,
+						action: 'select',
+						fileName: m.name
+					});
+				}
+			} else {
+				items.push({
+					label: '$(warning) No models found at external endpoint',
+					description: discovery.error || 'Verify server is running',
+					action: 'switch-provider'
+				});
+			}
+		} catch (e: any) {
+			items.push({
+				label: '$(error) Could not connect to external endpoint',
+				description: e?.message,
+				action: 'switch-provider'
+			});
+		}
+	}
+
+	// Section 2: Installed Local Models (if in embedded mode or available)
 	if (installed.length > 0) {
 		items.push({
 			label: 'INSTALLED LOCAL MODELS',
@@ -224,7 +372,7 @@ async function showModelPicker(): Promise<void> {
 		}
 	}
 
-	// Section 2: Curated Models to Download
+	// Section 3: Curated Models to Download (US-1.4: Hardware-Aware Recommendations)
 	const notInstalled = CURATED_MODELS.filter(
 		c => !installed.some(i => i.fileName.toLowerCase() === c.fileName.toLowerCase())
 	);
@@ -238,9 +386,10 @@ async function showModelPicker(): Promise<void> {
 
 		for (const curated of notInstalled) {
 			const gb = (curated.fileSizeBytes / (1024 * 1024 * 1024)).toFixed(1);
+			const isRecommended = curated.id === hw.recommendedModelId;
 			items.push({
-				label: `$(cloud-download) ${curated.displayName}`,
-				description: `${gb} GB • ${curated.parameterSize}`,
+				label: `${isRecommended ? '$(star-full) ' : '$(cloud-download) '}${curated.displayName}`,
+				description: `${gb} GB • ${curated.parameterSize}${isRecommended ? ` • ★ Recommended for your ${hw.memoryDescription}` : ''}`,
 				detail: curated.description,
 				action: 'download',
 				curatedModel: curated
@@ -248,7 +397,7 @@ async function showModelPicker(): Promise<void> {
 		}
 	}
 
-	// Section 3: Management Actions
+	// Section 4: Management Actions
 	items.push({
 		label: 'ACTIONS',
 		kind: vscode.QuickPickItemKind.Separator,
@@ -274,7 +423,9 @@ async function showModelPicker(): Promise<void> {
 
 	if (!selected) return;
 
-	if (selected.action === 'select' && selected.fileName) {
+	if (selected.action === 'switch-provider') {
+		await switchInferenceProvider();
+	} else if (selected.action === 'select' && selected.fileName) {
 		await activateModel(selected.fileName);
 	} else if (selected.action === 'download' && selected.curatedModel) {
 		await downloadModelWithProgress(selected.curatedModel);

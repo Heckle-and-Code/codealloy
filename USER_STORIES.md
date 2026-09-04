@@ -48,7 +48,7 @@ The CodeAlloy desktop shell is bootstrapped from Code-OSS v1.96.4, branded with 
 
 ---
 
-## Epic 1: Embedded Local Inference Engine & Model Picker
+## Epic 1: Embedded Local Inference Engine & Model Picker `[COMPLETED]`
 
 CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle (~20MB, native Apple Silicon Metal and CUDA acceleration). Users do not need to install Ollama, Python, Docker, or external tools to run local models.
 
@@ -80,14 +80,14 @@ CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle 
   * **AC 1.3.4**: Markdown and code blocks are rendered with syntax highlighting, a 1-click "Copy" button, and an "Insert at Cursor" action that writes directly into the active editor buffer.
   * **AC 1.3.5**: If no model is active, the panel shows a helpful empty state guiding the user to select or download a model from the Status Bar Model Selector Dial.
 
-### US-1.4: Hardware-Aware Memory Prober & Recommendation
+### US-1.4: Hardware-Aware Memory Prober & Recommendation `[COMPLETED]`
 * **User Story**: As a first-time user, I want CodeAlloy to examine my machine's Unified Memory / VRAM and recommend the optimal model size, so that my system doesn't run out of memory.
 * **Acceptance Criteria**:
   * **AC 1.4.1**: On startup, CodeAlloy queries available system RAM and GPU architecture.
   * **AC 1.4.2**: Machines with $\le$ 16GB memory are recommended 1.5B–7B models; machines with 32GB+ are recommended 14B models.
   * **AC 1.4.3**: The UI warns before loading any model that exceeds 80% of available memory.
 
-### US-1.5: Hybrid External Endpoint Support (Ollama / vLLM / Remote)
+### US-1.5: Hybrid External Endpoint Support (Ollama / vLLM / Remote) `[COMPLETED]`
 * **User Story**: As a developer who already has a dedicated GPU workstation or remote vLLM server, I want to optionally connect CodeAlloy to an external endpoint instead of the embedded engine.
 * **Acceptance Criteria**:
   * **AC 1.5.1**: Users can toggle between "Embedded Local Engine" and "External Endpoint" in settings.

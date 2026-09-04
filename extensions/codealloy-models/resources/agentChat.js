@@ -274,15 +274,17 @@
 
 		switch (message.type) {
 			case 'syncState': {
+				const providerLabel = message.provider === 'external' ? 'External Endpoint' : 'Metal GPU Engine';
 				if (message.activeModel && message.serverRunning) {
 					if (modelNameEl) modelNameEl.textContent = message.activeModel;
 					if (statusDotEl) statusDotEl.className = 'status-dot';
-					if (modelBadgeEl) modelBadgeEl.title = 'Active: ' + message.activeModel + ' (Metal GPU Engine online)';
+					if (modelBadgeEl) modelBadgeEl.title = 'Active: ' + message.activeModel + ' (' + providerLabel + ' online)';
 
 					if (emptyTitle && emptyDesc && emptyActions) {
 						if (emptyFlame) emptyFlame.textContent = '🔥';
 						emptyTitle.innerHTML = 'Forge Agent Ready';
-						emptyDesc.innerHTML = '<span class="model-tag">' + escapeHtml(message.activeModel) + '</span><br><span style="margin-top: 4px; display: inline-block;">Local Metal GPU engine is active and private. Ask questions or click a quick prompt below:</span>';
+						const engineText = message.provider === 'external' ? 'Connected to external model endpoint.' : 'Local Metal GPU engine is active and private.';
+						emptyDesc.innerHTML = '<span class="model-tag">' + escapeHtml(message.activeModel) + '</span><br><span style="margin-top: 4px; display: inline-block;">' + engineText + ' Ask questions or click a quick prompt below:</span>';
 						emptyActions.innerHTML = '<div class="prompt-chips">' +
 							'<button class="chip-btn" onclick="sendQuickPrompt(\'Explain how this project is structured and what it does\')">&#9889; Explain project architecture</button>' +
 							'<button class="chip-btn" onclick="sendQuickPrompt(\'Write unit tests for the active code with edge cases\')">&#128736; Generate unit tests</button>' +
@@ -295,7 +297,7 @@
 				} else if (message.activeModel) {
 					if (modelNameEl) modelNameEl.textContent = message.activeModel;
 					if (statusDotEl) statusDotEl.className = 'status-dot offline';
-					if (modelBadgeEl) modelBadgeEl.title = 'Active: ' + message.activeModel + ' (Engine standby)';
+					if (modelBadgeEl) modelBadgeEl.title = 'Active: ' + message.activeModel + ' (' + providerLabel + ' standby)';
 
 					if (emptyTitle && emptyDesc && emptyActions) {
 						if (emptyFlame) emptyFlame.textContent = '⚡';

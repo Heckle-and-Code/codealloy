@@ -41,6 +41,11 @@
         "command": "codealloy.focusChat",
         "title": "CodeAlloy: Open / Focus Agent Chat",
         "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.switchProvider",
+        "title": "CodeAlloy: Switch Inference Engine Provider",
+        "category": "CodeAlloy"
       }
     ],
     "viewsContainers": {
@@ -64,10 +69,28 @@
     "configuration": {
       "title": "CodeAlloy Models",
       "properties": {
+        "codealloy.inferenceProvider": {
+          "type": "string",
+          "enum": [
+            "embedded",
+            "external"
+          ],
+          "enumDescriptions": [
+            "Native embedded llama.cpp C++ engine with Apple Silicon Metal GPU acceleration",
+            "External or remote inference provider (local Ollama, vLLM, LM Studio, or cloud GPU)"
+          ],
+          "default": "embedded",
+          "description": "Active inference engine provider for CodeAlloy"
+        },
+        "codealloy.externalEndpoint": {
+          "type": "string",
+          "default": "http://127.0.0.1:11434",
+          "description": "External inference provider endpoint URL (e.g. http://127.0.0.1:11434 for Ollama, http://localhost:1234 for LM Studio)"
+        },
         "codealloy.model.endpoint": {
           "type": "string",
           "default": "http://localhost:11434",
-          "description": "Ollama or OpenAI-compatible endpoint URL"
+          "description": "Legacy Ollama or OpenAI-compatible endpoint URL"
         },
         "codealloy.model.activeModel": {
           "type": "string",
