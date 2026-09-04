@@ -299,7 +299,8 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 				res.on('end', () => {
 					this._activeRequest = undefined;
-					this._outputChannel.appendLine(`[AgentChat] Stream ended successfully, total tokens: ${assistantMsg.content.length} chars`);
+					const preview = assistantMsg.content.substring(0, 80).replace(/\n/g, ' ');
+					this._outputChannel.appendLine(`[AgentChat] Stream ended successfully (${assistantMsg.content.length} chars): "${preview}..."`);
 					if (this._view) {
 						this._view.webview.postMessage({
 							type: 'streamEnd',
@@ -603,6 +604,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			padding: 8px 12px;
 			border-radius: 6px;
 			max-width: 90%;
+			color: #FFFFFF !important;
 		}
 
 		.message-bubble.assistant {
@@ -612,6 +614,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			padding: 10px 12px;
 			border-radius: 6px;
 			width: 100%;
+			color: #ECEFF4 !important;
 		}
 
 		.message-header {
@@ -619,22 +622,29 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			align-items: center;
 			justify-content: space-between;
 			font-size: 10px;
-			color: var(--ca-text-muted);
-			margin-bottom: 2px;
+			color: var(--ca-text-muted) !important;
+			margin-bottom: 4px;
 		}
 
 		.message-content {
 			word-break: break-word;
 			font-size: 12.5px;
 			line-height: 1.5;
+			color: #ECEFF4 !important;
 		}
 
 		.message-content p {
 			margin-bottom: 8px;
+			color: #ECEFF4 !important;
 		}
 
 		.message-content p:last-child {
 			margin-bottom: 0;
+		}
+
+		.message-bubble.user .message-content,
+		.message-bubble.user .message-content p {
+			color: #FFFFFF !important;
 		}
 
 		/* Code Blocks */
@@ -685,7 +695,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			padding: 8px 10px;
 			overflow-x: auto;
 			line-height: 1.4;
-			color: #D8DEE9;
+			color: #D8DEE9 !important;
 		}
 
 		/* Inline Code */
@@ -696,7 +706,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			border-radius: 3px;
 			font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
 			font-size: 11px;
-			color: var(--ca-gold);
+			color: var(--ca-gold) !important;
 		}
 
 		/* Input Footer */
@@ -729,7 +739,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			background: transparent;
 			border: none;
 			outline: none;
-			color: var(--ca-text-primary);
+			color: #ECEFF4 !important;
 			font-family: inherit;
 			font-size: 12.5px;
 			resize: none;

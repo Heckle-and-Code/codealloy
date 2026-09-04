@@ -166,36 +166,40 @@
 
 	function renderMarkdown(raw) {
 		if (!raw) return '';
-		const codeBlockRegex = /```([a-zA-Z0-9_\-]+)?\n([\s\S]*?)```/g;
-		let html = '';
-		let lastIndex = 0;
-		let match;
+		try {
+			const codeBlockRegex = /```([a-zA-Z0-9_\-]+)?\n([\s\S]*?)```/g;
+			let html = '';
+			let lastIndex = 0;
+			let match;
 
-		while ((match = codeBlockRegex.exec(raw)) !== null) {
-			const preceding = raw.substring(lastIndex, match.index);
-			html += renderTextParagraphs(preceding);
+			while ((match = codeBlockRegex.exec(raw)) !== null) {
+				const preceding = raw.substring(lastIndex, match.index);
+				html += renderTextParagraphs(preceding);
 
-			const lang = match[1] || 'code';
-			const codeContent = match[2];
-			const escaped = escapeHtml(codeContent);
+				const lang = match[1] || 'code';
+				const codeContent = match[2];
+				const escaped = escapeHtml(codeContent);
 
-			html += '<div class="code-block">' +
-				'<div class="code-header">' +
-					'<span>' + escapeHtml(lang) + '</span>' +
-					'<div class="code-actions">' +
-						'<button class="code-action-btn" onclick="insertCodeAtCursor(this)">Insert at Cursor</button>' +
-						'<button class="code-action-btn" onclick="copyCode(this)">Copy</button>' +
+				html += '<div class="code-block">' +
+					'<div class="code-header">' +
+						'<span>' + escapeHtml(lang) + '</span>' +
+						'<div class="code-actions">' +
+							'<button class="code-action-btn" onclick="insertCodeAtCursor(this)">Insert at Cursor</button>' +
+							'<button class="code-action-btn" onclick="copyCode(this)">Copy</button>' +
+						'</div>' +
 					'</div>' +
-				'</div>' +
-				'<pre><code>' + escaped + '</code></pre>' +
-			'</div>';
+					'<pre><code>' + escaped + '</code></pre>' +
+				'</div>';
 
-			lastIndex = match.index + match[0].length;
+				lastIndex = match.index + match[0].length;
+			}
+
+			const remaining = raw.substring(lastIndex);
+			html += renderTextParagraphs(remaining);
+			return html;
+		} catch (err) {
+			return '<p>' + escapeHtml(String(raw)) + '</p>';
 		}
-
-		const remaining = raw.substring(lastIndex);
-		html += renderTextParagraphs(remaining);
-		return html;
 	}
 
 	function renderTextParagraphs(text) {
@@ -353,33 +357,45 @@
 			}
 
 			case 'streamChunk': {
-				const asstDiv = document.getElementById(message.assistantMsgId) ||
-				                pendingAssistantTurnEl ||
-				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
-				if (asstDiv) {
-					if (!asstDiv._rawText) asstDiv._rawText = '';
-					asstDiv._rawText += message.chunk;
-					const contentEl = asstDiv.querySelector('.message-content');
-					if (contentEl) {
-						contentEl.innerHTML = renderMarkdown(asstDiv._rawText) + '<span class="typing-indicator"></span>';
+				try {
+					const asstDiv = document.getElementById(message.assistantMsgId) ||
+					                pendingAssistantTurnEl ||
+					                messagesContainer.querySelector('.message-bubble.assistant:last-child');
+					if (asstDiv) {
+						if (!asstDiv._rawText) asstDiv._rawText = '';
+						asstDiv._rawText += message.chunk;
+						if (asstDiv._rawText.trim().length > 0) {
+							const contentEl = asstDiv.querySelector('.message-content');
+							if (contentEl) {
+								contentEl.innerHTML = renderMarkdown(asstDiv._rawText) + '<span class="typing-indicator"></span>';
+							}
+						}
+						messagesContainer.scrollTop = messagesContainer.scrollHeight;
 					}
-					messagesContainer.scrollTop = messagesContainer.scrollHeight;
+				} catch (err) {
+					console.error('[AgentChat] Error handling chunk:', err);
 				}
 				break;
 			}
 
 			case 'streamEnd': {
-				const asstDiv = document.getElementById(message.assistantMsgId) ||
-				                pendingAssistantTurnEl ||
-				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
-				if (asstDiv) {
-					const contentEl = asstDiv.querySelector('.message-content');
-					if (contentEl) {
-						contentEl.innerHTML = renderMarkdown(message.fullContent || asstDiv._rawText || '');
+				try {
+					const asstDiv = document.getElementById(message.assistantMsgId) ||
+					                pendingAssistantTurnEl ||
+					                messagesContainer.querySelector('.message-bubble.assistant:last-child');
+					if (asstDiv) {
+						const finalContent = message.fullContent || asstDiv._rawText || '';
+						const contentEl = asstDiv.querySelector('.message-content');
+						if (contentEl) {
+							contentEl.innerHTML = renderMarkdown(finalContent);
+						}
+						messagesContainer.scrollTop = messagesContainer.scrollHeight;
 					}
-					messagesContainer.scrollTop = messagesContainer.scrollHeight;
+				} catch (err) {
+					console.error('[AgentChat] Error handling streamEnd:', err);
+				} finally {
+					endStreamUI();
 				}
-				endStreamUI();
 				break;
 			}
 
