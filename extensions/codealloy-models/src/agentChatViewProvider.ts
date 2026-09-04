@@ -54,7 +54,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			this._outputChannel.appendLine(`[AgentChat Webview Event] type: ${data.type}`);
 			switch (data.type) {
 				case 'sendMessage':
-					await this._handleUserPrompt(data.prompt);
+					await this._handleUserPrompt(data.prompt, data.assistantMsgId);
 					break;
 				case 'logError':
 					this._outputChannel.appendLine(`[AgentChat Webview JS Error]: ${data.error}`);
@@ -146,18 +146,21 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		vscode.window.showInformationMessage('CodeAlloy: Inserted code at cursor.');
 	}
 
-	private async _handleUserPrompt(prompt: string): Promise<void> {
+	private async _handleUserPrompt(prompt: string, incomingTurnId?: string): Promise<void> {
 		if (!prompt || prompt.trim().length === 0) return;
 
-		console.log('[AgentChat] Handling user prompt:', prompt);
+		const assistantMsgId = incomingTurnId || `assistant-${Date.now()}`;
+		this._outputChannel.appendLine(`[AgentChat] Handling prompt: "${prompt}" (turnId: ${assistantMsgId})`);
 
 		if (this._activeRequest) {
+			this._outputChannel.appendLine('[AgentChat Warning] Generation already in progress.');
 			vscode.window.showWarningMessage('CodeAlloy: Agent is currently generating a response.');
 			return;
 		}
 
 		const activeModel = this._modelManager.getActiveModel();
 		if (!activeModel) {
+			this._outputChannel.appendLine('[AgentChat Error] No active model selected');
 			if (this._view) {
 				this._view.webview.postMessage({
 					type: 'showNotice',
@@ -168,7 +171,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			return;
 		}
 
-		// 1. Push User Message immediately so UI updates with zero delay
+		// 1. Push User Message
 		const userMsg: ChatMessage = {
 			id: `user-${Date.now()}`,
 			role: 'user',
@@ -178,7 +181,6 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		this._messages.push(userMsg);
 
 		// 2. Prepare Assistant Turn
-		const assistantMsgId = `assistant-${Date.now()}`;
 		const assistantMsg: ChatMessage = {
 			id: assistantMsgId,
 			role: 'assistant',
@@ -199,7 +201,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		let serverStatus = this._llamaServer.getStatus();
 		if (!serverStatus.running) {
 			const fullPath = path.join(this._modelManager.getModelsDirectory(), activeModel);
-			console.log(`[AgentChat] Starting local llama-server engine with model: ${fullPath}`);
+			this._outputChannel.appendLine(`[AgentChat] Starting inference engine: ${fullPath}`);
 
 			if (this._view) {
 				this._view.webview.postMessage({
@@ -211,6 +213,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 			const started = await this._llamaServer.start(fullPath);
 			if (!started) {
+				this._outputChannel.appendLine(`[AgentChat Error] Failed to start engine for ${activeModel}`);
 				assistantMsg.content = `*(Failed to start inference engine for "${activeModel}". Please check Output > CodeAlloy Inference Engine for details.)*`;
 				if (this._view) {
 					this._view.webview.postMessage({
@@ -296,6 +299,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 				res.on('end', () => {
 					this._activeRequest = undefined;
+					this._outputChannel.appendLine(`[AgentChat] Stream ended successfully, total tokens: ${assistantMsg.content.length} chars`);
 					if (this._view) {
 						this._view.webview.postMessage({
 							type: 'streamEnd',
@@ -309,6 +313,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 			req.on('error', (err) => {
 				this._activeRequest = undefined;
+				this._outputChannel.appendLine(`[AgentChat Request Error]: ${err.message}`);
 				assistantMsg.content += `\n\n*(Error communicating with inference engine: ${err.message})*`;
 				if (this._view) {
 					this._view.webview.postMessage({

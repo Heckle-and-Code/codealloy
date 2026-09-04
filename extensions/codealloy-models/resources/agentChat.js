@@ -109,7 +109,7 @@
 		setStreamingUI(true);
 		messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-		vscode.postMessage({ type: 'sendMessage', prompt: text });
+		vscode.postMessage({ type: 'sendMessage', prompt: text, assistantMsgId: tempTurnId });
 	}
 
 	function sendCurrentPrompt() {
@@ -199,7 +199,7 @@
 	}
 
 	function renderTextParagraphs(text) {
-		if (!text.trim()) return '';
+		if (!text) return '';
 		const withInlineCode = escapeHtml(text).replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
 		const paragraphs = withInlineCode.split(/\n\n+/);
 		return paragraphs.map(function(p) {
@@ -353,7 +353,9 @@
 			}
 
 			case 'streamChunk': {
-				const asstDiv = document.getElementById(message.assistantMsgId) || pendingAssistantTurnEl;
+				const asstDiv = document.getElementById(message.assistantMsgId) ||
+				                pendingAssistantTurnEl ||
+				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
 				if (asstDiv) {
 					if (!asstDiv._rawText) asstDiv._rawText = '';
 					asstDiv._rawText += message.chunk;
@@ -367,8 +369,9 @@
 			}
 
 			case 'streamEnd': {
-				endStreamUI();
-				const asstDiv = document.getElementById(message.assistantMsgId) || pendingAssistantTurnEl;
+				const asstDiv = document.getElementById(message.assistantMsgId) ||
+				                pendingAssistantTurnEl ||
+				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
 				if (asstDiv) {
 					const contentEl = asstDiv.querySelector('.message-content');
 					if (contentEl) {
@@ -376,6 +379,7 @@
 					}
 					messagesContainer.scrollTop = messagesContainer.scrollHeight;
 				}
+				endStreamUI();
 				break;
 			}
 
