@@ -31,8 +31,36 @@
         "command": "codealloy.configureEndpoint",
         "title": "CodeAlloy: Configure Model Endpoint URL",
         "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.clearChat",
+        "title": "CodeAlloy: Clear Agent Chat History",
+        "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.focusChat",
+        "title": "CodeAlloy: Focus Agent Chat",
+        "category": "CodeAlloy"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codealloy-agent-panel",
+          "title": "CodeAlloy Agent",
+          "icon": "resources/anvil-flame.svg"
+        }
+      ]
+    },
+    "views": {
+      "codealloy-agent-panel": [
+        {
+          "type": "webview",
+          "id": "codealloy.agentView",
+          "name": "Forge Agent"
+        }
+      ]
+    },
     "configuration": {
       "title": "CodeAlloy Models",
       "properties": {

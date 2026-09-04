@@ -71,18 +71,27 @@ CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle 
   * **AC 1.2.2**: Selecting a model downloads the quantized GGUF directly into `~/.codealloy/models/` with streaming download progress in the status bar.
   * **AC 1.2.3**: Upon completion, the model is automatically verified, loaded into the embedded engine, and set as active.
 
-### US-1.3: Hardware-Aware Memory Prober & Recommendation
+### US-1.3: CodeAlloy Agent Chat Sidebar Panel & Streaming Client `[COMPLETED]`
+* **User Story**: As a developer, I want a dedicated CodeAlloy chat sidebar panel in the Activity Bar directly connected to the embedded local inference engine, so that I can have interactive coding conversations with the active local model with live token streaming and syntax-highlighted code.
+* **Acceptance Criteria**:
+  * **AC 1.3.1**: An Activity Bar item with the CodeAlloy flame/anvil icon provides a persistent `CodeAlloy Agent` sidebar view.
+  * **AC 1.3.2**: The panel displays an interactive Autonomy Dial (`L0` to `L4`) with Forge styling.
+  * **AC 1.3.3**: The chat interface supports multi-turn conversations with real-time SSE streaming from the embedded `llama-server` on `127.0.0.1:51434`.
+  * **AC 1.3.4**: Markdown and code blocks are rendered with syntax highlighting, a 1-click "Copy" button, and an "Insert at Cursor" action that writes directly into the active editor buffer.
+  * **AC 1.3.5**: If no model is active, the panel shows a helpful empty state guiding the user to select or download a model from the Status Bar Model Selector Dial.
+
+### US-1.4: Hardware-Aware Memory Prober & Recommendation
 * **User Story**: As a first-time user, I want CodeAlloy to examine my machine's Unified Memory / VRAM and recommend the optimal model size, so that my system doesn't run out of memory.
 * **Acceptance Criteria**:
-  * **AC 1.3.1**: On startup, CodeAlloy queries available system RAM and GPU architecture.
-  * **AC 1.3.2**: Machines with $\le$ 16GB memory are recommended 1.5B–7B models; machines with 32GB+ are recommended 14B models.
-  * **AC 1.3.3**: The UI warns before loading any model that exceeds 80% of available memory.
+  * **AC 1.4.1**: On startup, CodeAlloy queries available system RAM and GPU architecture.
+  * **AC 1.4.2**: Machines with $\le$ 16GB memory are recommended 1.5B–7B models; machines with 32GB+ are recommended 14B models.
+  * **AC 1.4.3**: The UI warns before loading any model that exceeds 80% of available memory.
 
-### US-1.4: Hybrid External Endpoint Support (Ollama / vLLM / Remote)
+### US-1.5: Hybrid External Endpoint Support (Ollama / vLLM / Remote)
 * **User Story**: As a developer who already has a dedicated GPU workstation or remote vLLM server, I want to optionally connect CodeAlloy to an external endpoint instead of the embedded engine.
 * **Acceptance Criteria**:
-  * **AC 1.4.1**: Users can toggle between "Embedded Local Engine" and "External Endpoint" in settings.
-  * **AC 1.4.2**: The external provider supports standard OpenAI-compatible `/v1/chat/completions` and Ollama endpoints.
+  * **AC 1.5.1**: Users can toggle between "Embedded Local Engine" and "External Endpoint" in settings.
+  * **AC 1.5.2**: The external provider supports standard OpenAI-compatible `/v1/chat/completions` and Ollama endpoints.
 
 ---
 

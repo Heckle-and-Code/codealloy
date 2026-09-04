@@ -3,10 +3,12 @@ import * as path from 'path';
 import { LocalModelManager, InstalledModel } from './modelManager';
 import { CURATED_MODELS, CuratedModel } from './modelCatalog';
 import { LlamaServerService } from './llamaServerService';
+import { AgentChatViewProvider } from './agentChatViewProvider';
 
 let modelStatusBarItem: vscode.StatusBarItem;
 let modelManager: LocalModelManager;
 let llamaServer: LlamaServerService;
+let chatProvider: AgentChatViewProvider;
 
 export function activate(context: vscode.ExtensionContext) {
 	modelManager = new LocalModelManager();
@@ -21,7 +23,17 @@ export function activate(context: vscode.ExtensionContext) {
 	modelStatusBarItem.command = 'codealloy.selectModel';
 	context.subscriptions.push(modelStatusBarItem);
 
-	// 2. Register Commands
+	// 2. Register Agent Chat View Provider
+	chatProvider = new AgentChatViewProvider(context.extensionUri, modelManager, llamaServer);
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(
+			AgentChatViewProvider.viewType,
+			chatProvider,
+			{ webviewOptions: { retainContextWhenHidden: true } }
+		)
+	);
+
+	// 3. Register Commands
 	context.subscriptions.push(
 		vscode.commands.registerCommand('codealloy.selectModel', async () => {
 			await showModelPicker();
@@ -31,7 +43,21 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(
 		vscode.commands.registerCommand('codealloy.refreshModels', () => {
 			updateStatusBar();
+			chatProvider.syncState();
 			vscode.window.showInformationMessage('CodeAlloy: Local models refreshed.');
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.clearChat', () => {
+			chatProvider.clearChat();
+			vscode.window.showInformationMessage('CodeAlloy: Agent chat history cleared.');
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.focusChat', () => {
+			vscode.commands.executeCommand('codealloy.agentView.focus');
 		})
 	);
 
@@ -70,6 +96,7 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.workspace.onDidChangeConfiguration(e => {
 			if (e.affectsConfiguration('codealloy.model')) {
 				updateStatusBar();
+				chatProvider.syncState();
 			}
 		})
 	);
@@ -96,9 +123,11 @@ async function activateModel(fileName: string): Promise<void> {
 	const started = await llamaServer.start(fullPath);
 	if (started) {
 		updateStatusBar();
+		chatProvider.syncState();
 		vscode.window.showInformationMessage(`CodeAlloy: Model "${fileName}" loaded into GPU memory (Metal active).`);
 	} else {
 		updateStatusBar();
+		chatProvider.syncState();
 		vscode.window.showWarningMessage(`CodeAlloy: Selected "${fileName}" (inference engine offline).`);
 	}
 }
