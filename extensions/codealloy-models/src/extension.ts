@@ -160,7 +160,6 @@ async function activateModel(fileName: string): Promise<void> {
 	if (started) {
 		updateStatusBar();
 		chatProvider.syncState();
-		vscode.window.showInformationMessage(`CodeAlloy: Model "${fileName}" loaded into GPU memory (Metal active).`);
 	} else {
 		updateStatusBar();
 		chatProvider.syncState();

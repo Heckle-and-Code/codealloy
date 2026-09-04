@@ -39,6 +39,11 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
+		// Proactively sync state immediately and after render
+		this.syncState();
+		setTimeout(() => this.syncState(), 100);
+		setTimeout(() => this.syncState(), 500);
+
 		// Handle messages from the webview
 		webviewView.webview.onDidReceiveMessage(async (data) => {
 			switch (data.type) {
@@ -310,11 +315,16 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		});
 	}
 
-	private _getHtmlForWebview(_webview: vscode.Webview): string {
+	private _getHtmlForWebview(webview: vscode.Webview): string {
+		const scriptUri = webview.asWebviewUri(
+			vscode.Uri.joinPath(this._extensionUri, 'resources', 'agentChat.js')
+		);
+
 		return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-inline';">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>CodeAlloy Agent</title>
 	<style>
@@ -811,311 +821,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		</div>
 	</div>
 
-	<script>
-		const vscode = acquireVsCodeApi();
-
-		const modelNameEl = document.getElementById('modelName');
-		const statusDotEl = document.getElementById('statusDot');
-		const modelBadgeEl = document.getElementById('modelBadge');
-		const clearBtn = document.getElementById('clearBtn');
-		const promptInput = document.getElementById('promptInput');
-		const sendBtn = document.getElementById('sendBtn');
-		const stopBtn = document.getElementById('stopBtn');
-		const messagesContainer = document.getElementById('messagesContainer');
-		const emptyState = document.getElementById('emptyState');
-		const emptyFlame = document.getElementById('emptyFlame');
-		const emptyTitle = document.getElementById('emptyTitle');
-		const emptyDesc = document.getElementById('emptyDesc');
-		const emptyActions = document.getElementById('emptyActions');
-		const autonomyDial = document.getElementById('autonomyDial');
-
-		let isStreaming = false;
-		let currentAssistantTurnId = null;
-
-		// Notify extension webview is ready
-		vscode.postMessage({ type: 'ready' });
-
-		// Autonomy Dial Event Handlers
-		autonomyDial.querySelectorAll('.autonomy-dial-btn').forEach(btn => {
-			btn.addEventListener('click', () => {
-				const level = btn.getAttribute('data-level');
-				autonomyDial.querySelectorAll('.autonomy-dial-btn').forEach(b => b.classList.remove('active'));
-				btn.classList.add('active');
-				vscode.postMessage({ type: 'setAutonomy', level });
-			});
-		});
-
-		window.triggerSelectModel = function() {
-			vscode.postMessage({ type: 'selectModel' });
-		};
-
-		window.sendQuickPrompt = function(promptText) {
-			if (isStreaming) return;
-			promptInput.value = '';
-			vscode.postMessage({ type: 'sendMessage', prompt: promptText });
-		};
-
-		modelBadgeEl.addEventListener('click', () => {
-			window.triggerSelectModel();
-		});
-
-		clearBtn.addEventListener('click', () => {
-			vscode.postMessage({ type: 'clearChat' });
-		});
-
-		stopBtn.addEventListener('click', () => {
-			vscode.postMessage({ type: 'abortStream' });
-			endStreamUI();
-		});
-
-		function sendCurrentPrompt() {
-			const text = promptInput.value.trim();
-			console.log('[AgentChat Webview] sendCurrentPrompt:', text, 'isStreaming:', isStreaming);
-			if (!text || isStreaming) return;
-			promptInput.value = '';
-			promptInput.style.height = 'auto';
-			vscode.postMessage({ type: 'sendMessage', prompt: text });
-		}
-		window.sendCurrentPrompt = sendCurrentPrompt;
-
-		sendBtn.addEventListener('click', sendCurrentPrompt);
-
-		promptInput.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter' && !e.shiftKey) {
-				e.preventDefault();
-				sendCurrentPrompt();
-			}
-		});
-
-		promptInput.addEventListener('input', () => {
-			promptInput.style.height = 'auto';
-			promptInput.style.height = Math.min(promptInput.scrollHeight, 140) + 'px';
-		});
-
-		function setStreamingUI(streaming) {
-			isStreaming = streaming;
-			if (streaming) {
-				sendBtn.style.display = 'none';
-				stopBtn.style.display = 'block';
-			} else {
-				sendBtn.style.display = 'flex';
-				stopBtn.style.display = 'none';
-			}
-		}
-
-		function endStreamUI() {
-			setStreamingUI(false);
-			const indicator = document.querySelector('.typing-indicator');
-			if (indicator) indicator.remove();
-		}
-
-		// Message Parser (handles basic markdown and code fences with actions)
-		function renderMarkdown(raw) {
-			const codeBlockRegex = /\`\`\`([a-zA-Z0-9_\-]+)?\n([\s\S]*?)\`\`\`/g;
-			let html = '';
-			let lastIndex = 0;
-			let match;
-
-			while ((match = codeBlockRegex.exec(raw)) !== null) {
-				const preceding = raw.substring(lastIndex, match.index);
-				html += renderTextParagraphs(preceding);
-
-				const lang = match[1] || 'code';
-				const codeContent = match[2];
-				const escaped = escapeHtml(codeContent);
-
-				html += \`<div class="code-block">
-					<div class="code-header">
-						<span>\${lang}</span>
-						<div class="code-actions">
-							<button class="code-action-btn" onclick="insertCodeAtCursor(this)">Insert at Cursor</button>
-							<button class="code-action-btn" onclick="copyCode(this)">Copy</button>
-						</div>
-					</div>
-					<pre><code>\${escaped}</code></pre>
-				</div>\`;
-
-				lastIndex = match.index + match[0].length;
-			}
-
-			const remaining = raw.substring(lastIndex);
-			html += renderTextParagraphs(remaining);
-			return html;
-		}
-
-		function renderTextParagraphs(text) {
-			if (!text.trim()) return '';
-			// Handle inline code
-			const withInlineCode = escapeHtml(text).replace(/\`([^\`]+)\`/g, '<code class="inline-code">$1</code>');
-			const paragraphs = withInlineCode.split(/\\n\\n+/);
-			return paragraphs.map(p => \`<p>\${p.replace(/\\n/g, '<br>')}</p>\`).join('');
-		}
-
-		function escapeHtml(str) {
-			return str
-				.replace(/&/g, '&amp;')
-				.replace(/</g, '&lt;')
-				.replace(/>/g, '&gt;')
-				.replace(/"/g, '&quot;')
-				.replace(/'/g, '&#039;');
-		}
-
-		window.insertCodeAtCursor = function(btn) {
-			const codeEl = btn.closest('.code-block').querySelector('pre code');
-			if (codeEl) {
-				vscode.postMessage({
-					type: 'insertAtCursor',
-					text: codeEl.textContent
-				});
-				const oldText = btn.textContent;
-				btn.textContent = 'Inserted!';
-				setTimeout(() => { btn.textContent = oldText; }, 1500);
-			}
-		};
-
-		window.copyCode = function(btn) {
-			const codeEl = btn.closest('.code-block').querySelector('pre code');
-			if (codeEl) {
-				navigator.clipboard.writeText(codeEl.textContent);
-				const oldText = btn.textContent;
-				btn.textContent = 'Copied!';
-				setTimeout(() => { btn.textContent = oldText; }, 1500);
-			}
-		};
-
-		// Extension Host Event Handler
-		window.addEventListener('message', (event) => {
-			const message = event.data;
-
-			switch (message.type) {
-				case 'syncState': {
-					if (message.activeModel && message.serverRunning) {
-						modelNameEl.textContent = message.activeModel;
-						statusDotEl.className = 'status-dot';
-						modelBadgeEl.title = 'Active: ' + message.activeModel + ' (Metal GPU Engine online)';
-
-						if (emptyTitle && emptyDesc && emptyActions) {
-							emptyFlame.textContent = '🔥';
-							emptyTitle.innerHTML = 'Forge Agent Ready';
-							emptyDesc.innerHTML = '<span class="model-tag">' + escapeHtml(message.activeModel) + '</span><br><span style="margin-top: 4px; display: inline-block;">Local Metal GPU engine is active and private. Ask questions or click a quick prompt below:</span>';
-							emptyActions.innerHTML = '<div class="prompt-chips">' +
-								'<button class="chip-btn" onclick="sendQuickPrompt(\\'Explain how this project is structured and what it does\\')">&#9889; Explain project architecture</button>' +
-								'<button class="chip-btn" onclick="sendQuickPrompt(\\'Write unit tests for the active code with edge cases\\')">&#128736; Generate unit tests</button>' +
-								'<button class="chip-btn" onclick="sendQuickPrompt(\\'Refactor the active code for better performance and readability\\')">&#10024; Refactor and optimize</button>' +
-								'</div>' +
-								'<div style="margin-top: 10px;">' +
-								'<button class="clear-btn" onclick="triggerSelectModel()" style="text-decoration: underline;">Switch model...</button>' +
-								'</div>';
-						}
-					} else if (message.activeModel) {
-						modelNameEl.textContent = message.activeModel;
-						statusDotEl.className = 'status-dot offline';
-						modelBadgeEl.title = 'Active: ' + message.activeModel + ' (Engine standby)';
-
-						if (emptyTitle && emptyDesc && emptyActions) {
-							emptyFlame.textContent = '⚡';
-							emptyTitle.innerHTML = 'Model Ready (Standby)';
-							emptyDesc.innerHTML = '<span class="model-tag">' + escapeHtml(message.activeModel) + '</span><br><span style="margin-top: 4px; display: inline-block;">Click below or send a prompt to ignite the local engine:</span>';
-							emptyActions.innerHTML = '<button class="btn-primary" onclick="sendQuickPrompt(\\'Hello CodeAlloy! Confirm engine is online.\\')">&#128293; Ignite Local Engine</button>' +
-								'<div style="margin-top: 10px;">' +
-								'<button class="clear-btn" onclick="triggerSelectModel()" style="text-decoration: underline;">Switch model...</button>' +
-								'</div>';
-						}
-					} else {
-						modelNameEl.textContent = 'No Model Active';
-						statusDotEl.className = 'status-dot offline';
-						modelBadgeEl.title = 'Click to select or download a local model';
-
-						if (emptyTitle && emptyDesc && emptyActions) {
-							emptyFlame.textContent = '❄️';
-							emptyTitle.innerHTML = 'No Local Model Active';
-							emptyDesc.innerHTML = 'Pick an installed GGUF model or download an open coding model (Qwen 2.5 Coder, DeepSeek R1) with 1 click.';
-							emptyActions.innerHTML = '<button class="btn-primary" onclick="triggerSelectModel()">Select or Download Model</button>';
-						}
-					}
-
-					if (message.autonomyLevel) {
-						autonomyDial.querySelectorAll('.autonomy-dial-btn').forEach(btn => {
-							btn.classList.toggle('active', btn.getAttribute('data-level') === message.autonomyLevel);
-						});
-					}
-
-					if (message.messages && message.messages.length > 0) {
-						emptyState.style.display = 'none';
-					}
-					break;
-				}
-
-				case 'streamStart': {
-					emptyState.style.display = 'none';
-					setStreamingUI(true);
-
-					// 1. Render user message
-					const userDiv = document.createElement('div');
-					userDiv.className = 'message-bubble user';
-					userDiv.innerHTML = \`<div class="message-content">\${renderMarkdown(message.userMsg.content)}</div>\`;
-					messagesContainer.appendChild(userDiv);
-
-					// 2. Render assistant container
-					currentAssistantTurnId = message.assistantMsgId;
-					const asstDiv = document.createElement('div');
-					asstDiv.className = 'message-bubble assistant';
-					asstDiv.id = message.assistantMsgId;
-					asstDiv.innerHTML = \`<div class="message-header">CodeAlloy Agent &bull; Just now</div><div class="message-content"><span class="typing-indicator"></span></div>\`;
-					messagesContainer.appendChild(asstDiv);
-
-					messagesContainer.scrollTop = messagesContainer.scrollHeight;
-					break;
-				}
-
-				case 'streamChunk': {
-					const asstDiv = document.getElementById(message.assistantMsgId);
-					if (asstDiv) {
-						if (!asstDiv._rawText) asstDiv._rawText = '';
-						asstDiv._rawText += message.chunk;
-						const contentEl = asstDiv.querySelector('.message-content');
-						if (contentEl) {
-							contentEl.innerHTML = renderMarkdown(asstDiv._rawText) + '<span class="typing-indicator"></span>';
-						}
-						messagesContainer.scrollTop = messagesContainer.scrollHeight;
-					}
-					break;
-				}
-
-				case 'streamEnd': {
-					endStreamUI();
-					const asstDiv = document.getElementById(message.assistantMsgId);
-					if (asstDiv) {
-						const contentEl = asstDiv.querySelector('.message-content');
-						if (contentEl) {
-							contentEl.innerHTML = renderMarkdown(message.fullContent);
-						}
-					}
-					break;
-				}
-
-				case 'chatCleared': {
-					messagesContainer.innerHTML = '';
-					messagesContainer.appendChild(emptyState);
-					emptyState.style.display = 'block';
-					endStreamUI();
-					break;
-				}
-
-				case 'showNotice': {
-					const noticeDiv = document.createElement('div');
-					noticeDiv.className = 'message-bubble assistant';
-					noticeDiv.style.borderColor = message.level === 'error' ? 'var(--ca-error)' : 'var(--ca-amber)';
-					noticeDiv.innerHTML = \`<div class="message-content" style="color: \${message.level === 'error' ? 'var(--ca-error)' : 'var(--ca-gold)'}; font-weight: 500;">
-						\${escapeHtml(message.message)}
-					</div>\`;
-					messagesContainer.appendChild(noticeDiv);
-					messagesContainer.scrollTop = messagesContainer.scrollHeight;
-					break;
-				}
-			}
-		});
-	</script>
+	<script src="${scriptUri}"></script>
 </body>
 </html>`;
 	}
