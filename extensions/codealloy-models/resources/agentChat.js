@@ -167,7 +167,7 @@
 	function renderMarkdown(raw) {
 		if (!raw) return '';
 		try {
-			const codeBlockRegex = /```([a-zA-Z0-9_\-\.\/:]+)?\n([\s\S]*?)```/g;
+			const codeBlockRegex = /```([a-zA-Z0-9_\-\.\/:]+)?\n([\s\S]*?)(?:```|$)/g;
 			let html = '';
 			let lastIndex = 0;
 			let match;
