@@ -21,6 +21,8 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 	private _view?: vscode.WebviewView;
 	private _messages: ChatMessage[] = [];
 	private _activeRequest?: http.ClientRequest;
+	private _currentPrompt?: string;
+	private _currentAssistantMsg?: ChatMessage;
 	private _autonomyLevel: string = 'L2'; // L0, L1, L2 (Supervisor), L3, L4
 	private _outputChannel: vscode.OutputChannel;
 
@@ -63,7 +65,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 					this._outputChannel.appendLine(`[AgentChat Webview JS Error]: ${data.error}`);
 					break;
 				case 'abortStream':
-					this._abortActiveStream();
+					await this._abortActiveStream();
 					break;
 				case 'clearChat':
 					this.clearChat();
@@ -130,7 +132,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
-	private _abortActiveStream(): void {
+	private async _abortActiveStream(): Promise<void> {
 		if (this._activeRequest) {
 			try {
 				this._activeRequest.destroy();
@@ -138,6 +140,15 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 				console.error('[AgentChat] Error aborting stream:', e);
 			}
 			this._activeRequest = undefined;
+		}
+
+		// Ensure any partially generated file is saved and opened
+		if (this._currentPrompt && this._currentAssistantMsg && this._currentAssistantMsg.content.trim().length > 0) {
+			try {
+				await this._detectAndExecuteFiles(this._currentPrompt, this._currentAssistantMsg.content, this._currentAssistantMsg.id);
+			} catch (e: any) {
+				this._outputChannel.appendLine(`[AgentChat Error saving file on abort]: ${e?.message}`);
+			}
 		}
 	}
 
@@ -164,7 +175,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
 			const targetUri = workspaceFolder ? vscode.Uri.joinPath(workspaceFolder, filePath) : vscode.Uri.file(path.resolve(filePath));
 			const doc = await vscode.workspace.openTextDocument(targetUri);
-			await vscode.window.showTextDocument(doc, { preview: false });
+			await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.One });
 		} catch (err: any) {
 			vscode.window.showErrorMessage(`CodeAlloy: Could not open "${filePath}": ${err?.message}`);
 		}
@@ -181,7 +192,9 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 				if (activeDoc && activeDoc.scheme === 'file') {
 					targetUri = vscode.Uri.joinPath(vscode.Uri.file(path.dirname(activeDoc.fsPath)), fileName);
 				} else {
-					const fallbackBase = process.env.CODEALLOY_WORKSPACE || path.join(os.homedir(), 'CodeAlloyProjects');
+					const fallbackBase = process.env.CODEALLOY_WORKSPACE ||
+						vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath ||
+						'/Users/peter/source/Heckle and Code Projects/editor';
 					if (!fs.existsSync(fallbackBase)) {
 						try { fs.mkdirSync(fallbackBase, { recursive: true }); } catch {}
 					}
@@ -200,9 +213,9 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			const relPath = workspaceFolder ? vscode.workspace.asRelativePath(targetUri) : targetUri.fsPath;
 			this._outputChannel.appendLine(`[AgentChat] Successfully wrote file to filesystem: ${targetUri.fsPath} (${content.length} bytes)`);
 
-			// Open file in active editor
+			// Open file in active editor area (column 1 next to sidebar)
 			const doc = await vscode.workspace.openTextDocument(targetUri);
-			await vscode.window.showTextDocument(doc, { preview: false });
+			await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.One });
 
 			vscode.window.showInformationMessage(`CodeAlloy Agent: Created "${path.basename(targetUri.fsPath)}" on filesystem.`);
 
@@ -345,6 +358,8 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			timestamp: Date.now()
 		};
 		this._messages.push(assistantMsg);
+		this._currentPrompt = prompt;
+		this._currentAssistantMsg = assistantMsg;
 
 		if (this._view) {
 			this._view.webview.postMessage({

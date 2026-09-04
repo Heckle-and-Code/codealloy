@@ -190,10 +190,7 @@
 				html += '<div class="code-block">' +
 					'<div class="code-header">' +
 						'<span>' + displayHeader + '</span>' +
-						'<div class="code-actions">' +
-							'<button class="code-action-btn" onclick="insertCodeAtCursor(this)">Insert at Cursor</button>' +
-							'<button class="code-action-btn" onclick="copyCode(this)">Copy</button>' +
-						'</div>' +
+						'<span style="font-size: 10px; color: var(--ca-success); font-weight: 600;">⚡ Autonomous File</span>' +
 					'</div>' +
 					'<pre><code>' + escaped + '</code></pre>' +
 				'</div>';
