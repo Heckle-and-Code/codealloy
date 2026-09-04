@@ -22,6 +22,12 @@ fi
 echo "⚡ Syncing CodeAlloy product configuration..."
 cp "${ROOT_DIR}/build/product.json" "${UPSTREAM_DIR}/product.json"
 
+echo "⚡ Syncing CodeAlloy built-in extensions..."
+mkdir -p "${UPSTREAM_DIR}/extensions"
+ln -sfn "${ROOT_DIR}/extensions/codealloy-models" "${UPSTREAM_DIR}/extensions/codealloy-models"
+(cd "${ROOT_DIR}" && "${UPSTREAM_DIR}/node_modules/typescript/bin/tsc" -p extensions/codealloy-models/tsconfig.json 2>/dev/null || true)
+
+
 ORIGINAL_PWD="$(pwd)"
 TARGET_ARGS=()
 if [ $# -eq 0 ]; then

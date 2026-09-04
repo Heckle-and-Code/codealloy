@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2022",
+    "outDir": "out",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "sourceMap": true,
+    "rootDir": "src",
+    "strict": false,
+    "noImplicitAny": false,
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "typeRoots": [
+      "/Users/peter/.codealloy/build/code-oss/node_modules/@types"
+    ]
+  },
+  "include": [
+    "src",
+    "/Users/peter/.codealloy/build/code-oss/src/vscode-dts/vscode.d.ts"
+  ]
+}

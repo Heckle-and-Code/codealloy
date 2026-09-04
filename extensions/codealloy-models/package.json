@@ -1,0 +1,61 @@
+{
+  "name": "codealloy-models",
+  "displayName": "CodeAlloy Open Models",
+  "description": "Dynamic open model discovery and runtime manager for Ollama, vLLM, and LM Studio",
+  "version": "0.1.0",
+  "publisher": "codealloy",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codealloy.selectModel",
+        "title": "CodeAlloy: Select Active Model",
+        "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.refreshModels",
+        "title": "CodeAlloy: Refresh Discovered Models",
+        "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.configureEndpoint",
+        "title": "CodeAlloy: Configure Model Endpoint URL",
+        "category": "CodeAlloy"
+      }
+    ],
+    "configuration": {
+      "title": "CodeAlloy Models",
+      "properties": {
+        "codealloy.model.endpoint": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama or OpenAI-compatible endpoint URL"
+        },
+        "codealloy.model.activeModel": {
+          "type": "string",
+          "default": "",
+          "description": "Currently selected open model for CodeAlloy"
+        },
+        "codealloy.model.autoDiscover": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically discover models on startup and interval"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  }
+}
