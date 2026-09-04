@@ -11,7 +11,8 @@ import { LlamaServerService } from './llamaServerService';
 
 export interface ChatMessage {
 	id: string;
-	role: 'user' | 'assistant' | 'system';
+	role: 'user' | 'assistant' | 'system' | 'tool';
+	name?: string;
 	content: string;
 	timestamp: number;
 }
@@ -225,7 +226,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 				this._view.webview.postMessage({
 					type: 'fileCreated',
 					assistantMsgId,
-					fileName: path.basename(targetUri.fsPath),
+					fileName: fileName,
 					filePath: targetUri.fsPath,
 					bytes: content.length
 				});
@@ -239,7 +240,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
-	private async _executeShellCommand(command: string, assistantMsgId: string): Promise<boolean> {
+	private async _executeShellCommand(command: string, assistantMsgId: string): Promise<{ success: boolean; output: string }> {
 		const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
 			process.env.CODEALLOY_WORKSPACE ||
 			'/Users/peter/source/Heckle and Code Projects/editor';
@@ -248,7 +249,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		if (/\brm\s+-rf\s+\/($|\s)/.test(command) || /\bsudo\b/.test(command)) {
 			this._outputChannel.appendLine(`[AgentChat Command Blocked]: "${command}"`);
 			vscode.window.showErrorMessage(`CodeAlloy: Command blocked by safety guard: "${command}"`);
-			return false;
+			return { success: false, output: 'Command blocked by safety guardrail.' };
 		}
 
 		this._outputChannel.appendLine(`[AgentChat] Executing shell command in ${workspaceFolder}: ${command}`);
@@ -262,21 +263,22 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		}
 
 		return new Promise((resolve) => {
-			exec(command, { cwd: workspaceFolder, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+			exec(command, { cwd: workspaceFolder, maxBuffer: 10 * 1024 * 1024, timeout: 60000 }, (err, stdout, stderr) => {
 				if (err) {
-					this._outputChannel.appendLine(`[AgentChat Command Error]: ${err.message}`);
+					const errMsg = err.message || stderr || 'Execution error';
+					this._outputChannel.appendLine(`[AgentChat Command Error]: ${errMsg}`);
 					if (this._view) {
 						this._view.webview.postMessage({
 							type: 'commandCompleted',
 							assistantMsgId,
 							command,
 							success: false,
-							error: err.message
+							error: errMsg
 						});
 					}
-					resolve(false);
+					resolve({ success: false, output: errMsg });
 				} else {
-					const out = stdout.trim() || stderr.trim();
+					const out = stdout.trim() || stderr.trim() || 'Executed successfully with exit code 0';
 					this._outputChannel.appendLine(`[AgentChat Command Succeeded]: ${out}`);
 					vscode.window.showInformationMessage(`CodeAlloy: Executed "${command.trim()}"`);
 					if (this._view) {
@@ -288,10 +290,93 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 							output: out
 						});
 					}
-					resolve(true);
+					resolve({ success: true, output: out });
 				}
 			});
 		});
+	}
+
+	private _parseToolActions(text: string): Array<{ name: string; arguments: any }> {
+		const actions: Array<{ name: string; arguments: any }> = [];
+
+		// 1. JSON tool calls in markdown fences: ```json\n{\n  "name": "...", "arguments": { ... } }\n```
+		const jsonRegex = /```(?:json)?\s*(\{\s*"name"\s*:\s*"[^"]+"[\s\S]*?\})\s*```/g;
+		let jsonMatch;
+		while ((jsonMatch = jsonRegex.exec(text)) !== null) {
+			try {
+				const parsed = JSON.parse(jsonMatch[1]);
+				if (parsed.name && parsed.arguments) {
+					actions.push({ name: parsed.name, arguments: parsed.arguments });
+				}
+			} catch {}
+		}
+
+		// 2. Raw JSON tool calls without fences
+		if (actions.length === 0) {
+			const rawJsonRegex = /(\{\s*"name"\s*:\s*"(?:execute_command|write_file|read_file|list_dir)"\s*,\s*"arguments"\s*:\s*\{[\s\S]*?\}\s*\})/g;
+			let rawMatch;
+			while ((rawMatch = rawJsonRegex.exec(text)) !== null) {
+				try {
+					const parsed = JSON.parse(rawMatch[1]);
+					if (parsed.name && parsed.arguments) {
+						actions.push({ name: parsed.name, arguments: parsed.arguments });
+					}
+				} catch {}
+			}
+		}
+
+		// 3. XML tool calls: <tool_call>...</tool_call>
+		const toolCallRegex = /<tool_call>([\s\S]*?)<\/tool_call>/g;
+		let tcMatch;
+		while ((tcMatch = toolCallRegex.exec(text)) !== null) {
+			try {
+				const parsed = JSON.parse(tcMatch[1].trim());
+				if (parsed.name && parsed.arguments) {
+					actions.push({ name: parsed.name, arguments: parsed.arguments });
+				}
+			} catch {}
+		}
+
+		// 4. XML actions: <actions><action><name>...</name><arguments>...</arguments></action></actions>
+		const xmlActionRegex = /<action>[\s\S]*?<name>([\s\S]*?)<\/name>[\s\S]*?<arguments>([\s\S]*?)<\/arguments>[\s\S]*?<\/action>/g;
+		let xmlMatch;
+		while ((xmlMatch = xmlActionRegex.exec(text)) !== null) {
+			const name = xmlMatch[1].trim();
+			const argsRaw = xmlMatch[2].trim();
+			let args: any = {};
+			try {
+				args = JSON.parse(argsRaw);
+			} catch {
+				const argKeyRegex = /<([a-zA-Z0-9_\-]+)>([\s\S]*?)<\/\1>/g;
+				let argMatch;
+				while ((argMatch = argKeyRegex.exec(argsRaw)) !== null) {
+					args[argMatch[1]] = argMatch[2].trim();
+				}
+			}
+			actions.push({ name, arguments: args });
+		}
+
+		// 5. Explicit file fences: ```file:path or ```write:path
+		const explicitFileRegex = /```(?:file|write|create|write_file):([a-zA-Z0-9_\-\.\/]+)\n([\s\S]*?)(?:```|$)/g;
+		let fileMatch;
+		while ((fileMatch = explicitFileRegex.exec(text)) !== null) {
+			actions.push({
+				name: 'write_file',
+				arguments: { path: fileMatch[1].trim(), content: fileMatch[2].replace(/```+$/, '') }
+			});
+		}
+
+		// 6. Explicit bash command fences: ```bash:run
+		const cmdFenceRegex = /```(?:bash:run|sh:run|terminal:run)(?::run)?\n([\s\S]*?)(?:```|$)/g;
+		let cmdMatch;
+		while ((cmdMatch = cmdFenceRegex.exec(text)) !== null) {
+			actions.push({
+				name: 'execute_command',
+				arguments: { command: cmdMatch[1].replace(/```+$/, '').trim() }
+			});
+		}
+
+		return actions;
 	}
 
 	private async _detectAndExecuteFiles(
@@ -333,8 +418,8 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 					.map((c) => c.trim())
 					.filter((c) => c.length > 0 && !c.startsWith('#'));
 				for (const cmd of commands) {
-					const ok = await this._executeShellCommand(cmd, assistantMsgId);
-					if (ok) executedAny = true;
+					const res = await this._executeShellCommand(cmd, assistantMsgId);
+					if (res.success) executedAny = true;
 				}
 			}
 		}
@@ -399,6 +484,108 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		return executedAny;
 	}
 
+	private async _executeInferenceStream(
+		provider: string,
+		externalEndpoint: string,
+		activeModel: string,
+		messages: any[],
+		tools: any[],
+		assistantMsgId: string,
+		onChunk: (chunk: string) => void
+	): Promise<boolean> {
+		const requestBody = JSON.stringify({
+			model: activeModel,
+			messages,
+			tools,
+			stream: true,
+			temperature: 0.1,
+			max_tokens: 4096
+		});
+
+		let isHttps = false;
+		let reqOptions: http.RequestOptions;
+
+		if (provider === 'embedded') {
+			const currentPort = this._llamaServer.getStatus().port || 51434;
+			reqOptions = {
+				hostname: '127.0.0.1',
+				port: currentPort,
+				path: '/v1/chat/completions',
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Content-Length': Buffer.byteLength(requestBody)
+				}
+			};
+		} else {
+			try {
+				const parsed = new URL(externalEndpoint);
+				isHttps = parsed.protocol === 'https:';
+				const port = parsed.port ? parseInt(parsed.port, 10) : (isHttps ? 443 : 80);
+				const basePath = parsed.pathname.replace(/\/+$/, '');
+				reqOptions = {
+					hostname: parsed.hostname,
+					port,
+					path: `${basePath}/v1/chat/completions`,
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'Content-Length': Buffer.byteLength(requestBody)
+					}
+				};
+			} catch (e: any) {
+				this._outputChannel.appendLine(`[AgentChat Error] Invalid external endpoint URL: ${externalEndpoint}`);
+				return false;
+			}
+		}
+
+		return new Promise<boolean>((resolve) => {
+			const client = isHttps ? https : http;
+			const req = client.request(reqOptions, (res) => {
+				let buffer = '';
+
+				res.on('data', (chunk: Buffer) => {
+					buffer += chunk.toString();
+					const lines = buffer.split('\n');
+					buffer = lines.pop() || '';
+
+					for (const line of lines) {
+						const trimmed = line.trim();
+						if (!trimmed || !trimmed.startsWith('data:')) continue;
+
+						const payload = trimmed.substring(5).trim();
+						if (payload === '[DONE]') {
+							continue;
+						}
+
+						try {
+							const parsed = JSON.parse(payload);
+							const delta = parsed.choices?.[0]?.delta?.content;
+							if (delta) {
+								onChunk(delta);
+							}
+						} catch {}
+					}
+				});
+
+				res.on('end', () => {
+					this._activeRequest = undefined;
+					resolve(true);
+				});
+			});
+
+			req.on('error', (err) => {
+				this._activeRequest = undefined;
+				this._outputChannel.appendLine(`[AgentChat Stream Error]: ${err.message}`);
+				resolve(false);
+			});
+
+			this._activeRequest = req;
+			req.write(requestBody);
+			req.end();
+		});
+	}
+
 	private async _handleUserPrompt(prompt: string, incomingTurnId?: string): Promise<void> {
 		if (!prompt || prompt.trim().length === 0) return;
 
@@ -433,7 +620,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		};
 		this._messages.push(userMsg);
 
-		// 2. Prepare Assistant Turn
+		// 2. Prepare Assistant Turn in UI
 		const assistantMsg: ChatMessage = {
 			id: assistantMsgId,
 			role: 'assistant',
@@ -452,7 +639,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			});
 		}
 
-		// 3. Ensure inference engine is available based on provider
+		// 3. Ensure inference engine is running
 		const config = vscode.workspace.getConfiguration('codealloy');
 		const provider = config.get<string>('inferenceProvider', 'embedded');
 		const externalEndpoint = config.get<string>('externalEndpoint', 'http://127.0.0.1:11434');
@@ -490,195 +677,149 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			this._outputChannel.appendLine(`[AgentChat] Using external provider at ${externalEndpoint} for model: ${activeModel}`);
 		}
 
-		// 4. Prepare conversation context for /v1/chat/completions
-		// Filter out any incomplete or empty turns so the model never receives a trailing empty assistant turn
-		const history = this._messages
-			.filter((m) => m.id !== assistantMsgId && m.id !== userMsg.id && m.content.trim().length > 0)
-			.slice(-8)
-			.map((m) => ({
-				role: m.role,
-				content: m.content.trim()
-			}));
-
-		let systemPrompt =
-			'You are CodeAlloy Agent, the autonomous engineering partner embedded directly in the CodeAlloy IDE.\n' +
-			'You have direct, full capability to forge files and execute terminal commands in the workspace.\n\n' +
-			'STRICT OPERATING RULES:\n' +
-			'1. NEVER give tutorials, step-by-step numbered guides, or tell the user how to do something (e.g., NEVER say "Here is how you can...", "1. Create the folder: mkdir", "2. Run cd", etc.).\n' +
-			'2. YOU MUST EXECUTE ALL ACTIONS AUTONOMOUSLY:\n' +
-			'   - To create or modify files, output:\n' +
-			'     ```file:<relative_path>\n' +
-			'     <complete code content>\n' +
-			'     ```\n' +
-			'   - To run terminal commands (e.g. creating virtual environments, installing dependencies, creating directories), output:\n' +
-			'     ```bash:run\n' +
-			'     <shell command>\n' +
-			'     ```\n' +
-			'3. For example, if instructed: "create a new folder called api and create in it a virtual environment and a fast api shell", you MUST output:\n' +
-			'   ```bash:run\n' +
-			'   mkdir -p api && python3 -m venv api/.venv\n' +
-			'   ```\n' +
-			'   ```file:api/main.py\n' +
-			'   from fastapi import FastAPI\n\n' +
-			'   app = FastAPI(title="FastAPI Shell")\n\n' +
-			'   @app.get("/")\n' +
-			'   def read_root():\n' +
-			'       return {"status": "online", "message": "FastAPI service running"}\n' +
-			'   ```\n' +
-			'   ```file:api/requirements.txt\n' +
-			'   fastapi>=0.110.0\n' +
-			'   uvicorn>=0.28.0\n' +
-			'   ```\n' +
-			'4. CodeAlloy will automatically parse and execute every command and write every file directly to disk.\n' +
-			'5. Keep conversational dialogue to a single brief sentence.';
-
-		const apiMessages = [
+		// 4. Tool Definitions
+		const tools = [
 			{
-				role: 'system',
-				content: systemPrompt
+				type: 'function',
+				function: {
+					name: 'write_file',
+					description: 'Write or overwrite a file directly in the workspace filesystem and open it in the editor.',
+					parameters: {
+						type: 'object',
+						properties: {
+							path: { type: 'string', description: 'Relative file path (e.g. "api/main.py" or "portfolio.html")' },
+							content: { type: 'string', description: 'Complete source code or text content to write' }
+						},
+						required: ['path', 'content']
+					}
+				}
 			},
-			...history,
 			{
-				role: 'user',
-				content: prompt.trim()
+				type: 'function',
+				function: {
+					name: 'execute_command',
+					description: 'Execute a terminal or shell command in the workspace root directory (e.g. creating virtual environments, installing dependencies, creating directories).',
+					parameters: {
+						type: 'object',
+						properties: {
+							command: { type: 'string', description: 'Shell command to execute' }
+						},
+						required: ['command']
+					}
+				}
 			}
 		];
 
-		const requestBody = JSON.stringify({
-			model: activeModel,
-			messages: apiMessages,
-			stream: true,
-			temperature: 0.2,
-			max_tokens: 4096
-		});
+		const systemPrompt =
+			'You are CodeAlloy Agent, the autonomous AI engineering partner embedded directly in the CodeAlloy IDE.\n' +
+			'You have direct, full capability to forge files and execute terminal commands in the workspace using tools.\n\n' +
+			'STRICT OPERATING RULES:\n' +
+			'1. NEVER give tutorials, step-by-step numbered guides, or tell the user how to do something (e.g., NEVER say "Here is how you can...", "1. Create the folder: mkdir", "2. Run cd", etc.).\n' +
+			'2. YOU MUST EXECUTE ALL ACTIONS AUTONOMOUSLY using the available tools:\n' +
+			'   - Call execute_command to run terminal commands (creating folders, setting up virtual environments, installing dependencies).\n' +
+			'   - Call write_file to create or overwrite project files on disk.\n' +
+			'3. Continue invoking tools until all requested directories, environments, and files are created.\n' +
+			'4. When all actions are complete, conclude with a single concise confirmation sentence.\n' +
+			'5. Do not output conversational preamble before calling tools.';
 
-		let isHttps = false;
-		let reqOptions: http.RequestOptions;
+		// 5. Multi-Turn Autonomous Agentic Execution Loop
+		const MAX_AGENTIC_TURNS = 6;
+		let turnCount = 0;
+		let conversationMessages: any[] = [
+			{ role: 'system', content: systemPrompt },
+			...this._messages
+				.filter((m) => m.id !== assistantMsgId && m.id !== userMsg.id && m.content.trim().length > 0)
+				.slice(-6)
+				.map((m) => ({ role: m.role, content: m.content.trim() })),
+			{ role: 'user', content: prompt.trim() }
+		];
 
-		if (provider === 'embedded') {
-			const currentPort = this._llamaServer.getStatus().port || 51434;
-			reqOptions = {
-				hostname: '127.0.0.1',
-				port: currentPort,
-				path: '/v1/chat/completions',
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'Content-Length': Buffer.byteLength(requestBody)
-				}
-			};
-		} else {
-			try {
-				const parsed = new URL(externalEndpoint);
-				isHttps = parsed.protocol === 'https:';
-				const port = parsed.port ? parseInt(parsed.port, 10) : (isHttps ? 443 : 80);
-				const basePath = parsed.pathname.replace(/\/+$/, '');
-				reqOptions = {
-					hostname: parsed.hostname,
-					port,
-					path: `${basePath}/v1/chat/completions`,
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-						'Content-Length': Buffer.byteLength(requestBody)
+		let totalAccumulatedDisplay = '';
+
+		while (turnCount < MAX_AGENTIC_TURNS) {
+			turnCount++;
+			this._outputChannel.appendLine(`[AgentChat Loop] Turn ${turnCount}/${MAX_AGENTIC_TURNS} starting...`);
+
+			let turnContent = '';
+			const streamSuccess = await this._executeInferenceStream(
+				provider,
+				externalEndpoint,
+				activeModel,
+				conversationMessages,
+				tools,
+				assistantMsgId,
+				(chunk: string) => {
+					turnContent += chunk;
+					totalAccumulatedDisplay += chunk;
+					if (this._view) {
+						this._view.webview.postMessage({
+							type: 'streamChunk',
+							assistantMsgId,
+							chunk
+						});
 					}
-				};
-			} catch (e: any) {
-				assistantMsg.content = `*(Invalid external endpoint URL: "${externalEndpoint}")*`;
-				if (this._view) {
-					this._view.webview.postMessage({
-						type: 'streamEnd',
-						assistantMsgId,
-						fullContent: assistantMsg.content
+				}
+			);
+
+			if (!streamSuccess) {
+				if (!totalAccumulatedDisplay) {
+					totalAccumulatedDisplay = '*(Error communicating with inference engine)*';
+				}
+				break;
+			}
+
+			// Parse tool actions
+			const actions = this._parseToolActions(turnContent);
+			this._outputChannel.appendLine(`[AgentChat Loop] Turn ${turnCount} yielded ${actions.length} action(s).`);
+
+			if (actions.length === 0) {
+				// Fallback detection in case standard code blocks without tool format were returned
+				const executedFallback = await this._detectAndExecuteFiles(prompt, turnContent, assistantMsgId);
+				if (!executedFallback) {
+					this._outputChannel.appendLine(`[AgentChat Loop] No further actions. Agent completed task.`);
+				}
+				break;
+			}
+
+			// Add assistant turn to conversation context
+			conversationMessages.push({
+				role: 'assistant',
+				content: turnContent
+			});
+
+			// Execute all tool actions sequentially
+			for (const action of actions) {
+				if (action.name === 'execute_command' && action.arguments?.command) {
+					const cmd = action.arguments.command;
+					const res = await this._executeShellCommand(cmd, assistantMsgId);
+					conversationMessages.push({
+						role: 'tool',
+						name: 'execute_command',
+						content: res.success
+							? `Command "${cmd}" executed successfully with exit code 0. Output:\n${res.output}`
+							: `Command "${cmd}" failed with error: ${res.output}`
+					});
+				} else if (action.name === 'write_file' && action.arguments?.path && action.arguments?.content) {
+					const ok = await this._executeFileAction(action.arguments.path, action.arguments.content, assistantMsgId);
+					conversationMessages.push({
+						role: 'tool',
+						name: 'write_file',
+						content: ok
+							? `File "${action.arguments.path}" successfully created and opened in editor.`
+							: `Failed to write file "${action.arguments.path}".`
 					});
 				}
-				return;
 			}
 		}
 
-		await new Promise<void>((resolve) => {
-			const client = isHttps ? https : http;
-			const req = client.request(reqOptions, (res) => {
-				let buffer = '';
-
-				res.on('data', (chunk: Buffer) => {
-					buffer += chunk.toString();
-					const lines = buffer.split('\n');
-					buffer = lines.pop() || '';
-
-					for (const line of lines) {
-						const trimmed = line.trim();
-						if (!trimmed || !trimmed.startsWith('data:')) continue;
-
-						const payload = trimmed.substring(5).trim();
-						if (payload === '[DONE]') {
-							continue;
-						}
-
-						try {
-							const parsed = JSON.parse(payload);
-							const delta = parsed.choices?.[0]?.delta?.content;
-							if (delta) {
-								assistantMsg.content += delta;
-								if (this._view) {
-									this._view.webview.postMessage({
-										type: 'streamChunk',
-										assistantMsgId,
-										chunk: delta
-									});
-								}
-							}
-						} catch {
-							// Incomplete JSON or malformed chunk
-						}
-					}
-				});
-
-				res.on('end', async () => {
-					this._activeRequest = undefined;
-					const trimmedContent = assistantMsg.content.trim();
-					if (!trimmedContent) {
-						assistantMsg.content = '*(No response content returned by local model. Please re-send or ignite the engine.)*';
-					}
-					const preview = assistantMsg.content.substring(0, 80).replace(/\n/g, ' ');
-					this._outputChannel.appendLine(`[AgentChat] Stream ended successfully (${assistantMsg.content.length} chars): "${preview}..."`);
-					if (this._view) {
-						this._view.webview.postMessage({
-							type: 'streamEnd',
-							assistantMsgId,
-							fullContent: assistantMsg.content
-						});
-					}
-
-					// Detect and execute filesystem operations
-					try {
-						await this._detectAndExecuteFiles(prompt, assistantMsg.content, assistantMsgId);
-					} catch (e: any) {
-						this._outputChannel.appendLine(`[AgentChat Error detecting/executing files]: ${e?.message}`);
-					}
-
-					resolve();
-				});
+		assistantMsg.content = totalAccumulatedDisplay;
+		if (this._view) {
+			this._view.webview.postMessage({
+				type: 'streamEnd',
+				assistantMsgId,
+				fullContent: assistantMsg.content
 			});
-
-			req.on('error', (err) => {
-				this._activeRequest = undefined;
-				this._outputChannel.appendLine(`[AgentChat Request Error]: ${err.message}`);
-				assistantMsg.content += `\n\n*(Error communicating with inference engine: ${err.message})*`;
-				if (this._view) {
-					this._view.webview.postMessage({
-						type: 'streamEnd',
-						assistantMsgId,
-						fullContent: assistantMsg.content
-					});
-				}
-				resolve();
-			});
-
-			this._activeRequest = req;
-			req.write(requestBody);
-			req.end();
-		});
+		}
 	}
 
 	private _getHtmlForWebview(_webview: vscode.Webview): string {

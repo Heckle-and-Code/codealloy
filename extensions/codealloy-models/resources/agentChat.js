@@ -167,47 +167,106 @@
 	function renderMarkdown(raw) {
 		if (!raw) return '';
 		try {
+			let clean = raw;
+
+			// Convert <tool_call> and <actions> wrappers into markdown action tags
+			clean = clean.replace(/<tool_call>([\s\S]*?)<\/tool_call>/g, function(_m, inner) {
+				try {
+					const parsed = JSON.parse(inner.trim());
+					if (parsed.name === 'write_file') {
+						return '\n```file:' + (parsed.arguments?.path || 'file') + '\n' + (parsed.arguments?.content || '') + '\n```\n';
+					} else if (parsed.name === 'execute_command') {
+						return '\n```bash:run\n' + (parsed.arguments?.command || '') + '\n```\n';
+					}
+				} catch (e) {}
+				return '';
+			});
+
 			const codeBlockRegex = /```([a-zA-Z0-9_\-\.\/:]+)?\n([\s\S]*?)(?:```|$)/g;
 			let html = '';
 			let lastIndex = 0;
 			let match;
 
-			while ((match = codeBlockRegex.exec(raw)) !== null) {
-				const preceding = raw.substring(lastIndex, match.index);
+			while ((match = codeBlockRegex.exec(clean)) !== null) {
+				const preceding = clean.substring(lastIndex, match.index);
 				html += renderTextParagraphs(preceding);
 
-				const rawTag = (match[1] || '').trim();
+				const rawTag = (match[1] || '').trim().toLowerCase();
+				const blockBody = match[2];
 
-				// If this block represents a file being forged on disk, do NOT dump the code into the chat!
-				if (rawTag.startsWith('file:') || rawTag.startsWith('write:') || rawTag.startsWith('create:') || (rawTag.includes(':') && !rawTag.includes('run'))) {
-					const fileName = rawTag.includes(':') ? rawTag.split(':').slice(1).join(':').trim() : rawTag;
-					const statusText = isStreaming
-						? '<strong>Forging file:</strong> <code>' + escapeHtml(fileName) + '</code> &bull; <em>Streaming code to disk...</em>'
-						: '<strong>Created file:</strong> <code>' + escapeHtml(fileName) + '</code>';
-					html += '<div class="file-action-badge ' + (isStreaming ? 'forging' : 'created') + '" data-file="' + escapeHtml(fileName) + '" onclick="vscode.postMessage({ type: \'openFile\', path: \'' + escapeHtml(fileName) + '\' })">' +
-						'<span class="file-icon">' + (isStreaming ? '🔥' : '📄') + '</span> <span>' + statusText + '</span>' +
-					'</div>';
-				} else if (rawTag === 'bash:run' || rawTag === 'sh:run' || rawTag === 'terminal:run' || rawTag === 'bash' || rawTag === 'sh') {
-					const cmd = match[2].trim();
-					html += '<div class="file-action-badge forging" data-cmd="' + escapeHtml(cmd) + '">' +
-						'<span class="file-icon">⚡</span> <span><strong>Executing:</strong> <code>' + escapeHtml(cmd) + '</code></span>' +
-					'</div>';
-				} else {
-					// Clean snippet display with zero buttons
-					const lang = escapeHtml(rawTag || 'code');
-					const escaped = escapeHtml(match[2]);
-					html += '<div class="code-block">' +
-						'<div class="code-header">' +
-							'<span>' + lang + '</span>' +
-						'</div>' +
-						'<pre><code>' + escaped + '</code></pre>' +
-					'</div>';
+				// 1. Check if block is a JSON tool call
+				let isToolCall = false;
+				if (rawTag === 'json' || rawTag === '') {
+					try {
+						const parsed = JSON.parse(blockBody.trim());
+						if (parsed.name === 'write_file') {
+							isToolCall = true;
+							const fileName = parsed.arguments?.path || 'file';
+							const statusText = isStreaming
+								? '<strong>Forging file:</strong> <code>' + escapeHtml(fileName) + '</code> &bull; <em>Streaming code to disk...</em>'
+								: '<strong>Created file:</strong> <code>' + escapeHtml(fileName) + '</code>';
+							html += '<div class="file-action-badge ' + (isStreaming ? 'forging' : 'created') + '" data-file="' + escapeHtml(fileName) + '" onclick="vscode.postMessage({ type: \'openFile\', path: \'' + escapeHtml(fileName) + '\' })">' +
+								'<span class="file-icon">' + (isStreaming ? '🔥' : '📄') + '</span> <span>' + statusText + '</span>' +
+							'</div>';
+						} else if (parsed.name === 'execute_command') {
+							isToolCall = true;
+							const cmd = parsed.arguments?.command || '';
+							html += '<div class="file-action-badge ' + (isStreaming ? 'forging' : 'created') + '" data-cmd="' + escapeHtml(cmd) + '">' +
+								'<span class="file-icon">⚡</span> <span><strong>' + (isStreaming ? 'Executing:' : 'Executed:') + '</strong> <code>' + escapeHtml(cmd) + '</code></span>' +
+							'</div>';
+						}
+					} catch (e) {
+						// Check if partially streamed tool JSON
+						if (isStreaming && blockBody.includes('"name"') && blockBody.includes('write_file')) {
+							isToolCall = true;
+							const pathMatch = blockBody.match(/"path"\s*:\s*"([^"]+)/);
+							const fileName = pathMatch ? pathMatch[1] : 'file...';
+							html += '<div class="file-action-badge forging">' +
+								'<span class="file-icon">🔥</span> <span><strong>Forging file:</strong> <code>' + escapeHtml(fileName) + '</code> &bull; <em>Streaming code to disk...</em></span>' +
+							'</div>';
+						} else if (isStreaming && blockBody.includes('"name"') && blockBody.includes('execute_command')) {
+							isToolCall = true;
+							const cmdMatch = blockBody.match(/"command"\s*:\s*"([^"]+)/);
+							const cmd = cmdMatch ? cmdMatch[1] : 'command...';
+							html += '<div class="file-action-badge forging">' +
+								'<span class="file-icon">⚡</span> <span><strong>Executing:</strong> <code>' + escapeHtml(cmd) + '</code></span>' +
+							'</div>';
+						}
+					}
+				}
+
+				// 2. Check for explicit file fences: ```file:path or ```write:path
+				if (!isToolCall) {
+					if (rawTag.startsWith('file:') || rawTag.startsWith('write:') || rawTag.startsWith('create:') || (rawTag.includes(':') && !rawTag.includes('run'))) {
+						const fileName = rawTag.includes(':') ? rawTag.split(':').slice(1).join(':').trim() : rawTag;
+						const statusText = isStreaming
+							? '<strong>Forging file:</strong> <code>' + escapeHtml(fileName) + '</code> &bull; <em>Streaming code to disk...</em>'
+							: '<strong>Created file:</strong> <code>' + escapeHtml(fileName) + '</code>';
+						html += '<div class="file-action-badge ' + (isStreaming ? 'forging' : 'created') + '" data-file="' + escapeHtml(fileName) + '" onclick="vscode.postMessage({ type: \'openFile\', path: \'' + escapeHtml(fileName) + '\' })">' +
+							'<span class="file-icon">' + (isStreaming ? '🔥' : '📄') + '</span> <span>' + statusText + '</span>' +
+						'</div>';
+					} else if (rawTag === 'bash:run' || rawTag === 'sh:run' || rawTag === 'terminal:run' || rawTag === 'bash' || rawTag === 'sh') {
+						const cmd = blockBody.trim();
+						html += '<div class="file-action-badge ' + (isStreaming ? 'forging' : 'created') + '" data-cmd="' + escapeHtml(cmd) + '">' +
+							'<span class="file-icon">⚡</span> <span><strong>' + (isStreaming ? 'Executing:' : 'Executed:') + '</strong> <code>' + escapeHtml(cmd) + '</code></span>' +
+						'</div>';
+					} else {
+						// Clean read-only code display with zero buttons
+						const lang = escapeHtml(rawTag || 'code');
+						const escaped = escapeHtml(blockBody);
+						html += '<div class="code-block">' +
+							'<div class="code-header">' +
+								'<span>' + lang + '</span>' +
+							'</div>' +
+							'<pre><code>' + escaped + '</code></pre>' +
+						'</div>';
+					}
 				}
 
 				lastIndex = match.index + match[0].length;
 			}
 
-			const remaining = raw.substring(lastIndex);
+			const remaining = clean.substring(lastIndex);
 			html += renderTextParagraphs(remaining);
 			return html;
 		} catch (err) {
@@ -220,36 +279,11 @@
 		const withInlineCode = escapeHtml(text).replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
 		const paragraphs = withInlineCode.split(/\n\n+/);
 		return paragraphs.map(function(p) {
-			return '<p>' + p.replace(/\n/g, '<br>') + '</p>';
-		}).join('');
+			const trimmed = p.trim();
+			if (!trimmed) return '';
+			return '<p>' + trimmed.replace(/\n/g, '<br>') + '</p>';
+		}).filter(Boolean).join('');
 	}
-
-	window.insertCodeAtCursor = function(btn) {
-		const block = btn.closest('.code-block');
-		if (!block) return;
-		const codeEl = block.querySelector('pre code');
-		if (codeEl) {
-			vscode.postMessage({
-				type: 'insertAtCursor',
-				text: codeEl.textContent
-			});
-			const oldText = btn.textContent;
-			btn.textContent = 'Inserted!';
-			setTimeout(function() { btn.textContent = oldText; }, 1500);
-		}
-	};
-
-	window.copyCode = function(btn) {
-		const block = btn.closest('.code-block');
-		if (!block) return;
-		const codeEl = block.querySelector('pre code');
-		if (codeEl) {
-			navigator.clipboard.writeText(codeEl.textContent);
-			const oldText = btn.textContent;
-			btn.textContent = 'Copied!';
-			setTimeout(function() { btn.textContent = oldText; }, 1500);
-		}
-	};
 
 	function hydrateHistory(messages) {
 		if (!messages || messages.length === 0 || isStreaming) return;
