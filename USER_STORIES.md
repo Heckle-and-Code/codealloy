@@ -52,11 +52,11 @@ The CodeAlloy desktop shell is bootstrapped from Code-OSS v1.96.4, branded with 
 
 CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle (~20MB, native Apple Silicon Metal and CUDA acceleration). Users do not need to install Ollama, Python, Docker, or external tools to run local models.
 
-### US-1.1: Embedded Engine & Local Model Discovery
+### US-1.1: Embedded Engine & Local Model Discovery `[COMPLETED]`
 * **User Story**: As a developer, I want CodeAlloy to run local models out of the box using an embedded native inference engine without having to install external tools, and discover all local `.gguf` models on launch.
 * **Acceptance Criteria**:
   * **AC 1.1.1**: CodeAlloy discovers all models installed in `~/.codealloy/models/` on startup.
-  * **AC 1.1.2**: The bottom status bar features a **Model Selector Dial** (`⚡ CodeAlloy: <model-name>`) showing the currently active local model.
+  * **AC 1.1.2**: The bottom status bar features a **Model Selector Dial** (`$(flame) <model-name>`) showing the currently active local model.
   * **AC 1.1.3**: Clicking the Model Selector opens a QuickPick listing all installed models with parameters, file sizes, and quantization.
   * **AC 1.1.4**: Users can select "Add Local GGUF Model..." to point to any model already on their filesystem.
 
