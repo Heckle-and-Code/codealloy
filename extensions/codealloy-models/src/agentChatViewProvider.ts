@@ -217,7 +217,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			const doc = await vscode.workspace.openTextDocument(targetUri);
 			await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.One });
 
-			vscode.window.showInformationMessage(`CodeAlloy Agent: Created "${path.basename(targetUri.fsPath)}" on filesystem.`);
+			vscode.window.showInformationMessage(`CodeAlloy: Created "${path.basename(targetUri.fsPath)}" at ${targetUri.fsPath}`);
 
 			// Notify webview with confirmation
 			if (this._view) {
@@ -225,7 +225,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 					type: 'fileCreated',
 					assistantMsgId,
 					fileName: path.basename(targetUri.fsPath),
-					filePath: relPath,
+					filePath: targetUri.fsPath,
 					bytes: content.length
 				});
 			}

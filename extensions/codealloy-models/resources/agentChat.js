@@ -176,24 +176,25 @@
 				const preceding = raw.substring(lastIndex, match.index);
 				html += renderTextParagraphs(preceding);
 
-				const rawTag = (match[1] || 'code').trim();
-				let displayHeader = escapeHtml(rawTag);
-				if (rawTag.includes(':')) {
-					const parts = rawTag.split(':');
-					const subPath = parts.slice(1).join(':').trim();
-					displayHeader = '📄 <strong>' + escapeHtml(subPath) + '</strong> (' + escapeHtml(parts[0] || 'file') + ')';
+				const rawTag = (match[1] || '').trim();
+
+				// If this block represents a file being forged on disk, do NOT dump the code into the chat!
+				if (rawTag.startsWith('file:') || rawTag.startsWith('write:') || rawTag.startsWith('create:') || rawTag.includes(':')) {
+					const fileName = rawTag.includes(':') ? rawTag.split(':').slice(1).join(':').trim() : rawTag;
+					html += '<div class="file-action-badge" onclick="vscode.postMessage({ type: \'openFile\', path: \'' + escapeHtml(fileName) + '\' })">' +
+						'<span class="file-icon">📄</span> <span><strong>Created file:</strong> <code>' + escapeHtml(fileName) + '</code> &bull; <em>Opened in editor</em></span>' +
+					'</div>';
+				} else {
+					// Clean snippet display with zero buttons
+					const lang = escapeHtml(rawTag || 'code');
+					const escaped = escapeHtml(match[2]);
+					html += '<div class="code-block">' +
+						'<div class="code-header">' +
+							'<span>' + lang + '</span>' +
+						'</div>' +
+						'<pre><code>' + escaped + '</code></pre>' +
+					'</div>';
 				}
-
-				const codeContent = match[2];
-				const escaped = escapeHtml(codeContent);
-
-				html += '<div class="code-block">' +
-					'<div class="code-header">' +
-						'<span>' + displayHeader + '</span>' +
-						'<span style="font-size: 10px; color: var(--ca-success); font-weight: 600;">⚡ Autonomous File</span>' +
-					'</div>' +
-					'<pre><code>' + escaped + '</code></pre>' +
-				'</div>';
 
 				lastIndex = match.index + match[0].length;
 			}
@@ -410,13 +411,16 @@
 				                pendingAssistantTurnEl ||
 				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
 				if (asstDiv) {
-					const chip = document.createElement('div');
-					chip.className = 'file-action-badge';
+					let chip = asstDiv.querySelector('.file-action-badge');
+					if (!chip) {
+						chip = document.createElement('div');
+						chip.className = 'file-action-badge';
+						asstDiv.appendChild(chip);
+					}
 					chip.onclick = function() {
 						vscode.postMessage({ type: 'openFile', path: message.filePath });
 					};
-					chip.innerHTML = '<span class="file-icon">&#9889;</span> <span><strong>Created on filesystem:</strong> <code>' + escapeHtml(message.filePath) + '</code> <span class="file-size">(' + message.bytes + ' bytes)</span> &bull; <em>Click to reveal</em></span>';
-					asstDiv.appendChild(chip);
+					chip.innerHTML = '<span class="file-icon">📄</span> <span><strong>Created file:</strong> <code>' + escapeHtml(message.fileName) + '</code> &bull; <span class="file-size">' + escapeHtml(message.filePath) + '</span></span>';
 					messagesContainer.scrollTop = messagesContainer.scrollHeight;
 				}
 				break;
