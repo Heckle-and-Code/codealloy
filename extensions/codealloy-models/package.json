@@ -12,8 +12,7 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onStartupFinished",
-    "onView:codealloy.agentView"
+    "*"
   ],
   "main": "./out/extension.js",
   "contributes": {

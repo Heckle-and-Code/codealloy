@@ -127,6 +127,20 @@ export function activate(context: vscode.ExtensionContext) {
 			console.error('[CodeAlloy] Failed to auto-load active model:', err);
 		});
 	}
+
+	// Auto-open Agent Chat panel by default on startup (Agentic IDE default)
+	const openChatByDefault = async () => {
+		try {
+			await vscode.commands.executeCommand('codealloy.agentView.focus');
+		} catch {
+			try {
+				await vscode.commands.executeCommand('workbench.view.extension.codealloy-agent-panel');
+			} catch {}
+		}
+	};
+
+	setTimeout(openChatByDefault, 200);
+	setTimeout(openChatByDefault, 800);
 }
 
 async function activateModel(fileName: string): Promise<void> {
