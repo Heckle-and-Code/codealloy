@@ -133,9 +133,14 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 	private async _handleUserPrompt(prompt: string): Promise<void> {
 		if (!prompt || prompt.trim().length === 0) return;
 
-		const activeModel = this._modelManager.getActiveModel();
-		const serverStatus = this._llamaServer.getStatus();
+		console.log('[AgentChat] Handling user prompt:', prompt);
 
+		if (this._activeRequest) {
+			vscode.window.showWarningMessage('CodeAlloy: Agent is currently generating a response.');
+			return;
+		}
+
+		const activeModel = this._modelManager.getActiveModel();
 		if (!activeModel) {
 			if (this._view) {
 				this._view.webview.postMessage({
@@ -147,30 +152,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			return;
 		}
 
-		if (!serverStatus.running) {
-			const fullPath = path.join(this._modelManager.getModelsDirectory(), activeModel);
-			if (this._view) {
-				this._view.webview.postMessage({
-					type: 'showNotice',
-					level: 'info',
-					message: `Igniting Apple Silicon Metal GPU engine for "${activeModel}"...`
-				});
-			}
-			const started = await this._llamaServer.start(fullPath);
-			if (!started) {
-				if (this._view) {
-					this._view.webview.postMessage({
-						type: 'showNotice',
-						level: 'error',
-						message: `Failed to start inference engine for "${activeModel}". Check Output > CodeAlloy Inference Engine.`
-					});
-				}
-				return;
-			}
-			this.syncState();
-		}
-
-		// Push User Message
+		// 1. Push User Message immediately so UI updates with zero delay
 		const userMsg: ChatMessage = {
 			id: `user-${Date.now()}`,
 			role: 'user',
@@ -179,7 +161,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		};
 		this._messages.push(userMsg);
 
-		// Prepare Assistant Message
+		// 2. Prepare Assistant Turn
 		const assistantMsgId = `assistant-${Date.now()}`;
 		const assistantMsg: ChatMessage = {
 			id: assistantMsgId,
@@ -197,7 +179,37 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			});
 		}
 
-		// Prepare conversation context for /v1/chat/completions
+		// 3. Ensure local inference engine is running
+		let serverStatus = this._llamaServer.getStatus();
+		if (!serverStatus.running) {
+			const fullPath = path.join(this._modelManager.getModelsDirectory(), activeModel);
+			console.log(`[AgentChat] Starting local llama-server engine with model: ${fullPath}`);
+
+			if (this._view) {
+				this._view.webview.postMessage({
+					type: 'streamChunk',
+					assistantMsgId,
+					chunk: `*(Igniting Apple Silicon Metal GPU engine for "${activeModel}"...)*\n\n`
+				});
+			}
+
+			const started = await this._llamaServer.start(fullPath);
+			if (!started) {
+				assistantMsg.content = `*(Failed to start inference engine for "${activeModel}". Please check Output > CodeAlloy Inference Engine for details.)*`;
+				if (this._view) {
+					this._view.webview.postMessage({
+						type: 'streamEnd',
+						assistantMsgId,
+						fullContent: assistantMsg.content
+					});
+				}
+				return;
+			}
+			this.syncState();
+			serverStatus = this._llamaServer.getStatus();
+		}
+
+		// 4. Prepare conversation context for /v1/chat/completions
 		const apiMessages = [
 			{
 				role: 'system',
@@ -217,9 +229,10 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			temperature: 0.2
 		});
 
+		const currentPort = this._llamaServer.getStatus().port || 51434;
 		const reqOptions: http.RequestOptions = {
 			hostname: '127.0.0.1',
-			port: serverStatus.port || 51434,
+			port: currentPort,
 			path: '/v1/chat/completions',
 			method: 'POST',
 			headers: {
@@ -793,7 +806,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			<span>Local &bull; Private &bull; Open Models</span>
 			<div style="display: flex; gap: 6px;">
 				<button class="stop-btn" id="stopBtn">Stop</button>
-				<button class="send-btn" id="sendBtn">Forge &rarr;</button>
+				<button class="send-btn" id="sendBtn" onclick="window.sendCurrentPrompt()">Forge &rarr;</button>
 			</div>
 		</div>
 	</div>
@@ -857,11 +870,13 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 		function sendCurrentPrompt() {
 			const text = promptInput.value.trim();
+			console.log('[AgentChat Webview] sendCurrentPrompt:', text, 'isStreaming:', isStreaming);
 			if (!text || isStreaming) return;
 			promptInput.value = '';
 			promptInput.style.height = 'auto';
 			vscode.postMessage({ type: 'sendMessage', prompt: text });
 		}
+		window.sendCurrentPrompt = sendCurrentPrompt;
 
 		sendBtn.addEventListener('click', sendCurrentPrompt);
 
