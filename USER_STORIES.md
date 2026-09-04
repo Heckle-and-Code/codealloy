@@ -4,6 +4,50 @@ This document specifies the feature set of **CodeAlloy** in the form of agile us
 
 ---
 
+## Epic 0: Base IDE Foundation & CodeAlloy Shell
+
+Before any agent or AI capability can be layered in, CodeAlloy requires a working, branded desktop shell running locally with extension support and build pipelines.
+
+### US-0.1: Upstream Code-OSS Base & Patch Orchestration
+* **User Story**: As a core contributor, I want an automated build pipeline that pulls a pinned stable release of Code-OSS (or VSCodium build recipe) and applies CodeAlloy patches cleanly, so that we have a repeatable, clean build foundation without merge chaos.
+* **Acceptance Criteria**:
+  * **AC 0.1.1**: Build scripts fetch a pinned upstream version of Code-OSS (matching current stable VSCodium).
+  * **AC 0.1.2**: All dependencies (Node, Yarn, native build headers) install cleanly via a single setup script (`./scripts/bootstrap.sh` or `pnpm install`).
+  * **AC 0.1.3**: Upstream Microsoft telemetry endpoints and error reporting are stripped during the build step.
+
+### US-0.2: CodeAlloy Identity & `product.json` Branding
+* **User Story**: As a user opening the application, I want the window title, dock icon, splash screen, and "About" dialog to display **CodeAlloy** rather than "Code - OSS" or "VSCodium", so that the editor has its own unified identity.
+* **Acceptance Criteria**:
+  * **AC 0.2.1**: A custom `product.json` is configured with:
+    - `nameShort`: "CodeAlloy"
+    - `nameLong`: "CodeAlloy"
+    - `applicationName`: "codealloy"
+    - `darwinBundleIdentifier`: "com.heckleandcode.codealloy"
+    - `win32AppUserModelId`: "HeckleAndCode.CodeAlloy"
+  * **AC 0.2.2**: Application icons (macOS `.icns`, Windows `.ico`, Linux `.png`) are rendered and bundled into build outputs.
+  * **AC 0.2.3**: Running `codealloy --version` outputs CodeAlloy version strings and commit hash.
+
+### US-0.3: Extension Marketplace Configuration (Open VSX)
+* **User Story**: As a developer using the CodeAlloy shell, I want the Extensions panel to connect directly to the Open VSX registry out of the box, so that I can browse, install, and update standard VS Code extensions.
+* **Acceptance Criteria**:
+  * **AC 0.3.1**: `product.json` sets `extensionsGallery.serviceUrl` to `https://open-vsx.org/vscode/gallery`.
+  * **AC 0.3.2**: Opening the Extensions view (`Cmd+Shift+X`) immediately shows popular extensions from Open VSX (e.g. Python, Prettier, ESLint).
+  * **AC 0.3.3**: Installing and activating an extension (e.g. Prettier) succeeds without errors and operates normally.
+
+### US-0.4: Local Development & Electron Watch Loop
+* **User Story**: As a developer contributing to CodeAlloy, I want a fast local development loop (compile + launch Electron), so that I can make UI/shell changes and test them live without rebuilding the entire installer each time.
+* **Acceptance Criteria**:
+  * **AC 0.4.1**: Running `npm run dev` (or `./scripts/dev.sh`) compiles TypeScript sources in watch mode and launches the CodeAlloy Electron window.
+  * **AC 0.4.2**: DevTools can be toggled via `Cmd+Option+I` for debugging renderer and workbench state.
+
+### US-0.5: Native Desktop Packaging Smoke Test
+* **User Story**: As a maintainer, I want to execute a packaging smoke test that generates a local executable application (e.g., `CodeAlloy.app` / `.dmg` on macOS), so that we verify end-to-end bundling works before writing any agent logic.
+* **Acceptance Criteria**:
+  * **AC 0.5.1**: Running `./scripts/package.sh` produces a standalone `CodeAlloy.app` bundle in `out/` or `dist/`.
+  * **AC 0.5.2**: Double-clicking `CodeAlloy.app` launches the editor window independently without terminal dependencies.
+
+---
+
 ## Epic 1: Dynamic Model Discovery & Ollama Integration
 
 ### US-1.1: Automatic Discovery of Local Ollama Models
