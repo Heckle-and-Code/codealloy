@@ -88,12 +88,14 @@ if [ -f "${ROOT_DIR}/build/branding/icon.png" ]; then
     echo "  ✓ CodeAlloy branding assets overlaid"
 fi
 
-# Apply CodeAlloy welcome branding patch
-if [ -f "${ROOT_DIR}/patches/welcome-branding.patch" ]; then
-    cd "${BUILD_CACHE_DIR}"
-    git apply "${ROOT_DIR}/patches/welcome-branding.patch" 2>/dev/null || true
-    echo "  ✓ Applied CodeAlloy welcome & Open Models branding patch"
-fi
+# Apply CodeAlloy patches
+for patchfile in "${ROOT_DIR}/patches"/*.patch; do
+    if [ -f "${patchfile}" ]; then
+        cd "${BUILD_CACHE_DIR}"
+        git apply "${patchfile}" 2>/dev/null || true
+        echo "  ✓ Applied $(basename "${patchfile}")"
+    fi
+done
 
 # 4. Patch native spdlog for macOS Xcode 16 Clang consteval compatibility
 echo ""

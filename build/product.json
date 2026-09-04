@@ -20,6 +20,7 @@
   "telemetryConfiguration": {
     "default": false
   },
+  "openToWelcomeMainPage": true,
   "linkProtectionTrustedDomains": [
     "https://open-vsx.org",
     "https://github.com",
@@ -31,6 +32,7 @@
     "window.titleBarStyle": "native",
     "security.workspace.trust.enabled": false,
     "chat.experimental.offerSetup": false,
+    "workbench.welcomePage.walkthroughs.openOnInstall": false,
     "workbench.activityBar.location": "default",
     "workbench.statusBar.visible": true,
     "workbench.colorCustomizations": {

@@ -22,7 +22,26 @@ fi
 echo "⚡ Syncing CodeAlloy product configuration..."
 cp "${ROOT_DIR}/build/product.json" "${UPSTREAM_DIR}/product.json"
 
-echo "⚡ Launching CodeAlloy..."
-echo "💡 Tip: If Chrome DevTools inspector pane is open, press Cmd+Option+I (or click X) to close it."
+ORIGINAL_PWD="$(pwd)"
+TARGET_ARGS=()
+if [ $# -eq 0 ]; then
+    # Default to current working directory
+    TARGET_ARGS+=("${ORIGINAL_PWD}")
+else
+    for arg in "$@"; do
+        if [ "$arg" = "." ]; then
+            TARGET_ARGS+=("${ORIGINAL_PWD}")
+        elif [[ "$arg" = /* ]]; then
+            TARGET_ARGS+=("${arg}")
+        elif [ -e "${ORIGINAL_PWD}/${arg}" ]; then
+            TARGET_ARGS+=("${ORIGINAL_PWD}/${arg}")
+        else
+            TARGET_ARGS+=("${arg}")
+        fi
+    done
+fi
+
+echo "⚡ Launching CodeAlloy in ${TARGET_ARGS[0]}..."
 cd "${UPSTREAM_DIR}"
-./scripts/code.sh "$@"
+./scripts/code.sh "${TARGET_ARGS[@]}"
+
