@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
 import * as path from 'path';
+import * as fs from 'fs';
 import { LocalModelManager } from './modelManager';
 import { LlamaServerService } from './llamaServerService';
 
@@ -18,12 +19,15 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 	private _messages: ChatMessage[] = [];
 	private _activeRequest?: http.ClientRequest;
 	private _autonomyLevel: string = 'L1'; // L0, L1, L2, L3, L4
+	private _outputChannel: vscode.OutputChannel;
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
 		private readonly _modelManager: LocalModelManager,
 		private readonly _llamaServer: LlamaServerService
-	) {}
+	) {
+		this._outputChannel = vscode.window.createOutputChannel('CodeAlloy Agent Chat');
+	}
 
 	public resolveWebviewView(
 		webviewView: vscode.WebviewView,
@@ -31,6 +35,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		_token: vscode.CancellationToken
 	) {
 		this._view = webviewView;
+		this._outputChannel.appendLine(`[AgentChat] resolveWebviewView initialized (visible: ${webviewView.visible})`);
 
 		webviewView.webview.options = {
 			enableScripts: true,
@@ -46,9 +51,13 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 		// Handle messages from the webview
 		webviewView.webview.onDidReceiveMessage(async (data) => {
+			this._outputChannel.appendLine(`[AgentChat Webview Event] type: ${data.type}`);
 			switch (data.type) {
 				case 'sendMessage':
 					await this._handleUserPrompt(data.prompt);
+					break;
+				case 'logError':
+					this._outputChannel.appendLine(`[AgentChat Webview JS Error]: ${data.error}`);
 					break;
 				case 'abortStream':
 					this._abortActiveStream();
@@ -67,6 +76,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 					this.syncState();
 					break;
 				case 'ready':
+					this._outputChannel.appendLine('[AgentChat] Webview reported ready');
 					this.syncState();
 					break;
 			}
@@ -74,6 +84,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 		// Listen to visibility
 		webviewView.onDidChangeVisibility(() => {
+			this._outputChannel.appendLine(`[AgentChat] Visibility changed: ${webviewView.visible}`);
 			if (webviewView.visible) {
 				this.syncState();
 			}
@@ -315,16 +326,19 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		});
 	}
 
-	private _getHtmlForWebview(webview: vscode.Webview): string {
-		const scriptUri = webview.asWebviewUri(
-			vscode.Uri.joinPath(this._extensionUri, 'resources', 'agentChat.js')
-		);
+	private _getHtmlForWebview(_webview: vscode.Webview): string {
+		const scriptPath = path.join(this._extensionUri.fsPath, 'resources', 'agentChat.js');
+		let scriptContent = '';
+		try {
+			scriptContent = fs.readFileSync(scriptPath, 'utf8');
+		} catch (err: any) {
+			this._outputChannel.appendLine(`[AgentChat Error reading script]: ${err?.message}`);
+		}
 
 		return `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-inline';">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>CodeAlloy Agent</title>
 	<style>
@@ -466,6 +480,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		/* Messages Scroll Area */
 		.messages-container {
 			flex: 1;
+			min-height: 0;
 			overflow-y: auto;
 			padding: 12px;
 			display: flex;
@@ -851,7 +866,9 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		</div>
 	</div>
 
-	<script src="${scriptUri}"></script>
+	<script>
+${scriptContent}
+	</script>
 </body>
 </html>`;
 	}

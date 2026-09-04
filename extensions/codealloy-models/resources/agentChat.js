@@ -20,6 +20,12 @@
 	let currentAssistantTurnId = null;
 	let pendingAssistantTurnEl = null;
 
+	window.onerror = function(msg, url, line, col, error) {
+		try {
+			vscode.postMessage({ type: 'logError', error: String(msg) + ' (' + line + ':' + col + ')' });
+		} catch (e) {}
+	};
+
 	// Notify extension that webview is loaded
 	vscode.postMessage({ type: 'ready' });
 
