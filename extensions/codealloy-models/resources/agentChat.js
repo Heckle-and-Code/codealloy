@@ -18,6 +18,7 @@
 
 	let isStreaming = false;
 	let currentAssistantTurnId = null;
+	let pendingAssistantTurnEl = null;
 
 	// Notify extension that webview is loaded
 	vscode.postMessage({ type: 'ready' });
@@ -42,8 +43,7 @@
 
 	window.sendQuickPrompt = function(promptText) {
 		if (isStreaming) return;
-		if (promptInput) promptInput.value = '';
-		vscode.postMessage({ type: 'sendMessage', prompt: promptText });
+		executeSend(promptText);
 	};
 
 	if (modelBadgeEl) {
@@ -65,15 +65,50 @@
 		});
 	}
 
-	function sendCurrentPrompt() {
-		if (!promptInput) return;
-		const text = promptInput.value.trim();
-		console.log('[CodeAlloy Agent] sendCurrentPrompt:', text, 'isStreaming:', isStreaming);
+	function executeSend(text) {
+		text = (text || '').trim();
 		if (!text || isStreaming) return;
 
-		promptInput.value = '';
-		promptInput.style.height = 'auto';
+		if (promptInput) {
+			promptInput.value = '';
+			promptInput.style.height = 'auto';
+		}
+
+		// 1. Hide empty state immediately
+		if (emptyState) {
+			emptyState.style.display = 'none';
+		}
+
+		// 2. Optimistically render User bubble immediately
+		const userDiv = document.createElement('div');
+		userDiv.className = 'message-bubble user';
+		userDiv.innerHTML = '<div class="message-content">' + renderMarkdown(text) + '</div>';
+		messagesContainer.appendChild(userDiv);
+
+		// 3. Optimistically render Assistant thinking banner immediately
+		const tempTurnId = 'asst-turn-' + Date.now();
+		currentAssistantTurnId = tempTurnId;
+
+		const asstDiv = document.createElement('div');
+		asstDiv.className = 'message-bubble assistant';
+		asstDiv.id = tempTurnId;
+		asstDiv._rawText = '';
+		asstDiv.innerHTML = '<div class="message-header">CodeAlloy Agent &bull; Local Engine</div>' +
+			'<div class="message-content">' +
+				'<div class="forging-banner"><span class="flame-icon">🔥</span> <span>Thinking & forging response with local model...</span></div>' +
+			'</div>';
+		messagesContainer.appendChild(asstDiv);
+		pendingAssistantTurnEl = asstDiv;
+
+		setStreamingUI(true);
+		messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
 		vscode.postMessage({ type: 'sendMessage', prompt: text });
+	}
+
+	function sendCurrentPrompt() {
+		if (!promptInput) return;
+		executeSend(promptInput.value);
 	}
 	window.sendCurrentPrompt = sendCurrentPrompt;
 
@@ -108,6 +143,7 @@
 
 	function endStreamUI() {
 		setStreamingUI(false);
+		pendingAssistantTurnEl = null;
 		const indicator = document.querySelector('.typing-indicator');
 		if (indicator) indicator.remove();
 	}
@@ -192,6 +228,28 @@
 		}
 	};
 
+	function hydrateHistory(messages) {
+		if (!messages || messages.length === 0 || isStreaming) return;
+		const existing = messagesContainer.querySelectorAll('.message-bubble');
+		if (existing.length > 0) return; // Already populated
+
+		if (emptyState) emptyState.style.display = 'none';
+
+		messages.forEach(function(msg) {
+			const div = document.createElement('div');
+			div.className = 'message-bubble ' + (msg.role === 'user' ? 'user' : 'assistant');
+			if (msg.role === 'assistant') {
+				div.innerHTML = '<div class="message-header">CodeAlloy Agent &bull; Local Engine</div>' +
+					'<div class="message-content">' + renderMarkdown(msg.content) + '</div>';
+			} else {
+				div.innerHTML = '<div class="message-content">' + renderMarkdown(msg.content) + '</div>';
+			}
+			messagesContainer.appendChild(div);
+		});
+
+		messagesContainer.scrollTop = messagesContainer.scrollHeight;
+	}
+
 	// Listen for messages from extension host
 	window.addEventListener('message', function(event) {
 		const message = event.data;
@@ -250,8 +308,8 @@
 					});
 				}
 
-				if (message.messages && message.messages.length > 0 && emptyState) {
-					emptyState.style.display = 'none';
+				if (message.messages && message.messages.length > 0) {
+					hydrateHistory(message.messages);
 				}
 				break;
 			}
@@ -260,26 +318,36 @@
 				if (emptyState) emptyState.style.display = 'none';
 				setStreamingUI(true);
 
-				// 1. Render user message
-				const userDiv = document.createElement('div');
-				userDiv.className = 'message-bubble user';
-				userDiv.innerHTML = '<div class="message-content">' + renderMarkdown(message.userMsg.content) + '</div>';
-				messagesContainer.appendChild(userDiv);
+				// If we already created an optimistic turn, adopt the real ID
+				if (pendingAssistantTurnEl) {
+					pendingAssistantTurnEl.id = message.assistantMsgId;
+					currentAssistantTurnId = message.assistantMsgId;
+				} else {
+					// 1. Render user message
+					const userDiv = document.createElement('div');
+					userDiv.className = 'message-bubble user';
+					userDiv.innerHTML = '<div class="message-content">' + renderMarkdown(message.userMsg.content) + '</div>';
+					messagesContainer.appendChild(userDiv);
 
-				// 2. Render assistant turn container
-				currentAssistantTurnId = message.assistantMsgId;
-				const asstDiv = document.createElement('div');
-				asstDiv.className = 'message-bubble assistant';
-				asstDiv.id = message.assistantMsgId;
-				asstDiv.innerHTML = '<div class="message-header">CodeAlloy Agent &bull; Just now</div><div class="message-content"><span class="typing-indicator"></span></div>';
-				messagesContainer.appendChild(asstDiv);
+					// 2. Render assistant turn container
+					currentAssistantTurnId = message.assistantMsgId;
+					const asstDiv = document.createElement('div');
+					asstDiv.className = 'message-bubble assistant';
+					asstDiv.id = message.assistantMsgId;
+					asstDiv.innerHTML = '<div class="message-header">CodeAlloy Agent &bull; Local Engine</div>' +
+						'<div class="message-content">' +
+							'<div class="forging-banner"><span class="flame-icon">🔥</span> <span>Thinking & forging response with local model...</span></div>' +
+						'</div>';
+					messagesContainer.appendChild(asstDiv);
+					pendingAssistantTurnEl = asstDiv;
+				}
 
 				messagesContainer.scrollTop = messagesContainer.scrollHeight;
 				break;
 			}
 
 			case 'streamChunk': {
-				const asstDiv = document.getElementById(message.assistantMsgId);
+				const asstDiv = document.getElementById(message.assistantMsgId) || pendingAssistantTurnEl;
 				if (asstDiv) {
 					if (!asstDiv._rawText) asstDiv._rawText = '';
 					asstDiv._rawText += message.chunk;
@@ -294,12 +362,13 @@
 
 			case 'streamEnd': {
 				endStreamUI();
-				const asstDiv = document.getElementById(message.assistantMsgId);
+				const asstDiv = document.getElementById(message.assistantMsgId) || pendingAssistantTurnEl;
 				if (asstDiv) {
 					const contentEl = asstDiv.querySelector('.message-content');
 					if (contentEl) {
-						contentEl.innerHTML = renderMarkdown(message.fullContent);
+						contentEl.innerHTML = renderMarkdown(message.fullContent || asstDiv._rawText || '');
 					}
+					messagesContainer.scrollTop = messagesContainer.scrollHeight;
 				}
 				break;
 			}
@@ -317,6 +386,7 @@
 			}
 
 			case 'showNotice': {
+				endStreamUI();
 				const noticeDiv = document.createElement('div');
 				noticeDiv.className = 'message-bubble assistant';
 				noticeDiv.style.borderColor = message.level === 'error' ? 'var(--ca-error)' : 'var(--ca-amber)';

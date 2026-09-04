@@ -769,6 +769,36 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			animation: blink 0.8s infinite;
 		}
 
+		.forging-banner {
+			display: inline-flex;
+			align-items: center;
+			gap: 8px;
+			padding: 6px 12px;
+			background: rgba(255, 107, 0, 0.08);
+			border: 1px solid rgba(255, 107, 0, 0.3);
+			border-radius: 6px;
+			color: var(--ca-gold);
+			font-size: 11.5px;
+			font-weight: 500;
+			animation: forgePulse 1.5s infinite ease-in-out;
+		}
+
+		.flame-icon {
+			font-size: 14px;
+			display: inline-block;
+			animation: flameWiggle 1s infinite ease-in-out;
+		}
+
+		@keyframes forgePulse {
+			0%, 100% { opacity: 0.85; border-color: rgba(255, 107, 0, 0.25); }
+			50% { opacity: 1; border-color: rgba(255, 107, 0, 0.7); box-shadow: 0 0 10px rgba(255, 107, 0, 0.25); }
+		}
+
+		@keyframes flameWiggle {
+			0%, 100% { transform: scale(1); }
+			50% { transform: scale(1.2); }
+		}
+
 		@keyframes blink {
 			0%, 100% { opacity: 1; }
 			50% { opacity: 0; }
