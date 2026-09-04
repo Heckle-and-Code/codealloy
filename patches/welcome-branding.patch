@@ -1,0 +1,83 @@
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+index cb25dc9..61491c8 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
+@@ -831,7 +831,7 @@ export class GettingStartedPage extends EditorPane {
+ 
+ 		const header = $('.header', {},
+ 			$('h1.product-name.caption', {}, this.productService.nameLong),
+-			$('p.subtitle.description', {}, localize({ key: 'gettingStarted.editingEvolved', comment: ['Shown as subtitle on the Welcome page.'] }, "Editing evolved"))
++			$('p.subtitle.description', {}, localize({ key: 'gettingStarted.editingEvolved', comment: ['Shown as subtitle on the Welcome page.'] }, "Where developer intent meets open models."))
+ 		);
+ 
+ 		const leftColumn = $('.categories-column.categories-column-left', {},);
+diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
+index 303905c..3af976e 100644
+--- a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
++++ b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
+@@ -12,7 +12,6 @@ import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js'
+ import { NotebookSetting } from '../../notebook/common/notebookCommon.js';
+ import { CONTEXT_ACCESSIBILITY_MODE_ENABLED } from '../../../../platform/accessibility/common/accessibility.js';
+ import { URI } from '../../../../base/common/uri.js';
+-import product from '../../../../platform/product/common/product.js';
+ 
+ interface IGettingStartedContentProvider {
+ 	(): string;
+@@ -210,45 +209,32 @@ export const startEntries: GettingStartedStartEntryContent = [
+ 
+ const Button = (title: string, href: string) => `[${title}](${href})`;
+ 
+-const CopilotStepTitle = localize('gettingStarted.copilotSetup.title', "Use AI features with Copilot for free");
+-const CopilotDescription = localize({ key: 'gettingStarted.copilotSetup.description', comment: ['{Locked="["}', '{Locked="]({0})"}'] }, "You can use [Copilot]({0}) to generate code across multiple files, fix errors, ask questions about your code and much more using natural language.", product.defaultChatAgent?.documentationUrl ?? '');
+-const CopilotSignedOutButton = Button(localize('setupCopilotButton.signIn', "Set Up Copilot for Free"), `command:workbench.action.chat.triggerSetup`);
+-const CopilotSignedInButton = Button(localize('setupCopilotButton.setup', "Set Up Copilot for Free"), `command:workbench.action.chat.triggerSetup`);
+-const CopilotCompleteButton = Button(localize('setupCopilotButton.chatWithCopilot', "Chat with Copilot"), 'command:workbench.action.chat.open');
+ 
+-function createCopilotSetupStep(id: string, button: string, when: string, includeTerms: boolean): BuiltinGettingStartedStep {
+-	const description = includeTerms ?
+-		`${CopilotDescription}\n\n${button}` :
+-		`${CopilotDescription}\n${button}`;
+-
+-	return {
+-		id,
+-		title: CopilotStepTitle,
+-		description,
+-		when,
+-		media: {
+-			type: 'svg', altText: 'VS Code Copilot multi file edits', path: 'multi-file-edits.svg'
+-		},
+-	};
+-}
+ 
+ 
+ export const walkthroughs: GettingStartedWalkthroughContent = [
+ 	{
+ 		id: 'Setup',
+-		title: localize('gettingStarted.setup.title', "Get Started with VS Code"),
++		title: localize('gettingStarted.setup.title', "Get Started with CodeAlloy"),
+ 		description: localize('gettingStarted.setup.description', "Customize your editor, learn the basics, and start coding"),
+ 		isFeatured: true,
+ 		icon: setupIcon,
+ 		when: '!isWeb',
+-		walkthroughPageTitle: localize('gettingStarted.setup.walkthroughPageTitle', 'Setup VS Code'),
++		walkthroughPageTitle: localize('gettingStarted.setup.walkthroughPageTitle', 'Setup CodeAlloy'),
+ 		next: 'Beginner',
+ 		content: {
+ 			type: 'steps',
+ 			steps: [
+-				createCopilotSetupStep('CopilotSetupSignedOut', CopilotSignedOutButton, 'config.chat.experimental.offerSetup && chatSetupSignedOut', true),
+-				createCopilotSetupStep('CopilotSetupComplete', CopilotCompleteButton, 'config.chat.experimental.offerSetup && chatSetupInstalled && (chatSetupEntitled || chatSetupLimited)', false),
+-				createCopilotSetupStep('CopilotSetupSignedIn', CopilotSignedInButton, 'config.chat.experimental.offerSetup && !chatSetupSignedOut && (!chatSetupInstalled || chatSetupCanSignUp)', true),
++				{
++					id: 'openModelsSetup',
++					title: localize('gettingStarted.openModels.title', "Forge code with Open Models"),
++					description: localize('gettingStarted.openModels.description', "Connect CodeAlloy to Ollama, vLLM, or LM Studio for 100% private, local model execution with zero cloud lock-in.\n\n[Open Model Settings](command:workbench.action.openSettings)"),
++					media: {
++						type: 'svg',
++						altText: 'CodeAlloy Open Models',
++						path: 'languages.svg'
++					}
++				},
+ 				{
+ 					id: 'pickColorTheme',
+ 					title: localize('gettingStarted.pickColor.title', "Choose your theme"),

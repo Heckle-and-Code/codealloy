@@ -76,12 +76,23 @@ cp "${ROOT_DIR}/build/product.json" "${BUILD_CACHE_DIR}/product.json"
 echo "  ✓ Installed custom product.json (Open VSX configured, telemetry disabled)"
 
 # Copy icons if available
+if [ -f "${ROOT_DIR}/build/branding/CodeAlloy.icns" ]; then
+    mkdir -p "${BUILD_CACHE_DIR}/resources/darwin"
+    cp "${ROOT_DIR}/build/branding/CodeAlloy.icns" "${BUILD_CACHE_DIR}/resources/darwin/code.icns"
+fi
 if [ -f "${ROOT_DIR}/build/branding/icon.png" ]; then
     mkdir -p "${BUILD_CACHE_DIR}/resources/darwin"
     mkdir -p "${BUILD_CACHE_DIR}/resources/win32"
     mkdir -p "${BUILD_CACHE_DIR}/resources/linux"
     cp "${ROOT_DIR}/build/branding/icon.png" "${BUILD_CACHE_DIR}/resources/darwin/code.png"
     echo "  ✓ CodeAlloy branding assets overlaid"
+fi
+
+# Apply CodeAlloy welcome branding patch
+if [ -f "${ROOT_DIR}/patches/welcome-branding.patch" ]; then
+    cd "${BUILD_CACHE_DIR}"
+    git apply "${ROOT_DIR}/patches/welcome-branding.patch" 2>/dev/null || true
+    echo "  ✓ Applied CodeAlloy welcome & Open Models branding patch"
 fi
 
 # 4. Patch native spdlog for macOS Xcode 16 Clang consteval compatibility
