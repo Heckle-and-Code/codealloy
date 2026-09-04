@@ -5,6 +5,7 @@ import { URL } from 'url';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { exec } from 'child_process';
 import { LocalModelManager } from './modelManager';
 import { LlamaServerService } from './llamaServerService';
 
@@ -238,82 +239,164 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
+	private async _executeShellCommand(command: string, assistantMsgId: string): Promise<boolean> {
+		const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ||
+			process.env.CODEALLOY_WORKSPACE ||
+			'/Users/peter/source/Heckle and Code Projects/editor';
+
+		// US-2.3 Safety guardrail: reject destructive root commands
+		if (/\brm\s+-rf\s+\/($|\s)/.test(command) || /\bsudo\b/.test(command)) {
+			this._outputChannel.appendLine(`[AgentChat Command Blocked]: "${command}"`);
+			vscode.window.showErrorMessage(`CodeAlloy: Command blocked by safety guard: "${command}"`);
+			return false;
+		}
+
+		this._outputChannel.appendLine(`[AgentChat] Executing shell command in ${workspaceFolder}: ${command}`);
+
+		if (this._view) {
+			this._view.webview.postMessage({
+				type: 'commandStarted',
+				assistantMsgId,
+				command
+			});
+		}
+
+		return new Promise((resolve) => {
+			exec(command, { cwd: workspaceFolder, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
+				if (err) {
+					this._outputChannel.appendLine(`[AgentChat Command Error]: ${err.message}`);
+					if (this._view) {
+						this._view.webview.postMessage({
+							type: 'commandCompleted',
+							assistantMsgId,
+							command,
+							success: false,
+							error: err.message
+						});
+					}
+					resolve(false);
+				} else {
+					const out = stdout.trim() || stderr.trim();
+					this._outputChannel.appendLine(`[AgentChat Command Succeeded]: ${out}`);
+					vscode.window.showInformationMessage(`CodeAlloy: Executed "${command.trim()}"`);
+					if (this._view) {
+						this._view.webview.postMessage({
+							type: 'commandCompleted',
+							assistantMsgId,
+							command,
+							success: true,
+							output: out
+						});
+					}
+					resolve(true);
+				}
+			});
+		});
+	}
+
 	private async _detectAndExecuteFiles(
 		prompt: string,
 		content: string,
 		assistantMsgId: string
 	): Promise<boolean> {
 		const isL2Plus = this._autonomyLevel === 'L2' || this._autonomyLevel === 'L3' || this._autonomyLevel === 'L4';
-		const fileIntentRegex = /\b(create|make|write|generate|save|put|build|code|prototype)\b.*\b(file|script|module|routine|portfolio|website|page|webpage|app|component|template|html|python|css|javascript|typescript)\b/i;
-		const hasFileCreationIntent =
+		const fileIntentRegex = /\b(create|make|write|generate|save|put|build|code|prototype|setup|install|venv|virtual\s*env|environment)\b.*\b(file|script|module|routine|portfolio|website|page|webpage|app|component|template|html|python|css|javascript|typescript|api|shell|folder|directory)\b/i;
+		const hasActionIntent =
 			fileIntentRegex.test(prompt) ||
-			/\b(on the filesystem|to disk|in workspace|create the file|make the file)\b/i.test(prompt) ||
+			/\b(on the filesystem|to disk|in workspace|create the file|make the file|virtual environment|fastapi|venv)\b/i.test(prompt) ||
 			isL2Plus;
 
-		if (!hasFileCreationIntent) return false;
+		if (!hasActionIntent) return false;
 
-		// 1. Check for explicit file fence: ```file:portfolio.html or ```html:portfolio.html
-		// Match both closed (```) and unclosed (EOF) code blocks
+		let executedAny = false;
+
+		// 1. Check for explicit file fences: ```file:path or ```write:path
 		const explicitFenceRegex = /```(?:file|write|create|write_file|[a-zA-Z0-9_\-]+):([a-zA-Z0-9_\-\.\/]+)\n([\s\S]*?)(?:```|$)/g;
-		let match = explicitFenceRegex.exec(content);
-		if (match) {
+		let match;
+		while ((match = explicitFenceRegex.exec(content)) !== null) {
 			const fileName = match[1].trim();
-			const fileContent = match[2];
+			let fileContent = match[2].replace(/```+$/, '');
 			if (fileName && fileContent.trim().length > 0) {
-				return await this._executeFileAction(fileName, fileContent, assistantMsgId);
+				const ok = await this._executeFileAction(fileName, fileContent, assistantMsgId);
+				if (ok) executedAny = true;
 			}
 		}
 
-		// 2. Check for standard code block (matching both closed and unclosed)
-		const codeBlockRegex = /```([a-zA-Z0-9_\-]+)?\n([\s\S]*?)(?:```|$)/g;
-		const codeMatch = codeBlockRegex.exec(content);
-		if (!codeMatch) return false;
-
-		const codeContent = codeMatch[2];
-		const lang = (codeMatch[1] || '').toLowerCase();
-
-		// Extract filename from prompt or response (e.g. portfolio.html)
-		const fileNameRegex = /\b([a-zA-Z0-9_\-]+\.(?:py|js|ts|jsx|tsx|json|html|css|sh|md|go|rs|cpp|c|h|java|rb|php|sql|ya?ml|toml))\b/gi;
-		let extractedName: string | undefined;
-
-		// First check prompt (e.g. "make an html file named portfolio.html")
-		const promptMatches = Array.from(prompt.matchAll(fileNameRegex));
-		if (promptMatches.length > 0) {
-			extractedName = promptMatches[promptMatches.length - 1][1];
-		}
-
-		// Next check response text (e.g. "Save this file as portfolio.html")
-		if (!extractedName) {
-			const responseMatches = Array.from(content.matchAll(fileNameRegex));
-			if (responseMatches.length > 0) {
-				extractedName = responseMatches[0][1];
+		// 2. Check for shell command blocks: ```bash:run or ```bash or ```sh
+		const cmdFenceRegex = /```(?:bash:run|sh:run|terminal:run|bash|sh|shell)(?::run)?\n([\s\S]*?)(?:```|$)/g;
+		let cmdMatch;
+		while ((cmdMatch = cmdFenceRegex.exec(content)) !== null) {
+			const rawCmd = cmdMatch[1].replace(/```+$/, '').trim();
+			if (rawCmd.length > 0) {
+				const commands = rawCmd
+					.split('\n')
+					.map((c) => c.trim())
+					.filter((c) => c.length > 0 && !c.startsWith('#'));
+				for (const cmd of commands) {
+					const ok = await this._executeShellCommand(cmd, assistantMsgId);
+					if (ok) executedAny = true;
+				}
 			}
 		}
 
-		// Fallback default filename if user requested a script/file of specific language
-		if (!extractedName) {
-			if (lang === 'html' || /\b(html|portfolio|website|webpage|page)\b/i.test(prompt)) {
-				extractedName = 'portfolio.html';
-			} else if (lang === 'python' || (/\bpython\b/i.test(prompt) && !/\bhtml\b/i.test(prompt))) {
-				extractedName = 'main.py';
-			} else if (lang === 'javascript' || /\bjavascript\b/i.test(prompt)) {
-				extractedName = 'index.js';
-			} else if (lang === 'typescript' || /\btypescript\b/i.test(prompt)) {
-				extractedName = 'index.ts';
-			} else if (lang === 'css' || /\bcss\b/i.test(prompt)) {
-				extractedName = 'style.css';
-			} else if (lang) {
-				extractedName = `script.${lang}`;
-			} else {
-				extractedName = 'portfolio.html';
+		// 3. Fallback: single standard code block if no explicit fences were found
+		if (!executedAny) {
+			const codeBlockRegex = /```([a-zA-Z0-9_\-]+)?\n([\s\S]*?)(?:```|$)/g;
+			const codeMatch = codeBlockRegex.exec(content);
+			if (codeMatch) {
+				const codeContent = codeMatch[2];
+				const lang = (codeMatch[1] || '').toLowerCase();
+
+				// If language is bash/sh, execute as command
+				if (lang === 'bash' || lang === 'sh' || lang === 'shell') {
+					const commands = codeContent
+						.split('\n')
+						.map((c) => c.trim())
+						.filter((c) => c.length > 0 && !c.startsWith('#'));
+					for (const cmd of commands) {
+						await this._executeShellCommand(cmd, assistantMsgId);
+						executedAny = true;
+					}
+				} else {
+					const fileNameRegex = /\b([a-zA-Z0-9_\-]+\.(?:py|js|ts|jsx|tsx|json|html|css|sh|md|go|rs|cpp|c|h|java|rb|php|sql|ya?ml|toml))\b/gi;
+					let extractedName: string | undefined;
+
+					const promptMatches = Array.from(prompt.matchAll(fileNameRegex));
+					if (promptMatches.length > 0) {
+						extractedName = promptMatches[promptMatches.length - 1][1];
+					}
+					if (!extractedName) {
+						const responseMatches = Array.from(content.matchAll(fileNameRegex));
+						if (responseMatches.length > 0) {
+							extractedName = responseMatches[0][1];
+						}
+					}
+					if (!extractedName) {
+						if (lang === 'html' || /\b(html|portfolio|website|webpage|page)\b/i.test(prompt)) {
+							extractedName = 'portfolio.html';
+						} else if (lang === 'python' || (/\bpython\b/i.test(prompt) && !/\bhtml\b/i.test(prompt))) {
+							extractedName = /\bapi\b/i.test(prompt) ? 'api/main.py' : 'main.py';
+						} else if (lang === 'javascript' || /\bjavascript\b/i.test(prompt)) {
+							extractedName = 'index.js';
+						} else if (lang === 'typescript' || /\btypescript\b/i.test(prompt)) {
+							extractedName = 'index.ts';
+						} else if (lang === 'css' || /\bcss\b/i.test(prompt)) {
+							extractedName = 'style.css';
+						} else if (lang) {
+							extractedName = `script.${lang}`;
+						} else {
+							extractedName = 'main.py';
+						}
+					}
+
+					if (extractedName && codeContent.trim().length > 0) {
+						return await this._executeFileAction(extractedName, codeContent, assistantMsgId);
+					}
+				}
 			}
 		}
 
-		if (extractedName && codeContent.trim().length > 0) {
-			return await this._executeFileAction(extractedName, codeContent, assistantMsgId);
-		}
-
-		return false;
+		return executedAny;
 	}
 
 	private async _handleUserPrompt(prompt: string, incomingTurnId?: string): Promise<void> {
@@ -418,32 +501,36 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			}));
 
 		let systemPrompt =
-			'You are CodeAlloy Agent, an autonomous open-model coding partner embedded directly in the CodeAlloy IDE. You write concise, high-performance, production-ready code. Always specify language tags in markdown code fences. Keep explanations clear, precise, and directly actionable.';
-
-		const isL2Plus = this._autonomyLevel === 'L2' || this._autonomyLevel === 'L3' || this._autonomyLevel === 'L4';
-		const fileIntentRegex = /\b(create|make|write|generate|save|put|build|code|prototype)\b.*\b(file|script|module|routine|portfolio|website|page|webpage|app|component|template|html|python|css|javascript|typescript)\b/i;
-		const hasFileIntent =
-			fileIntentRegex.test(prompt) ||
-			/\b(on the filesystem|to disk|in workspace|create the file|make the file)\b/i.test(prompt);
-
-		if (isL2Plus || hasFileIntent) {
-			systemPrompt =
-				'You are CodeAlloy Agent, an autonomous open-model coding partner embedded directly in the CodeAlloy IDE.\n' +
-				'You have direct capability to forge and modify files on the workspace filesystem.\n' +
-				'When the user instructs you to create, write, generate, or prototype code/files, you MUST declare the file in a code block with the target filename in the tag:\n' +
-				'```file:<filename>\n' +
-				'<complete code content>\n' +
-				'```\n' +
-				'For example:\n' +
-				'```file:portfolio.html\n' +
-				'<!DOCTYPE html>\n' +
-				'<html>\n' +
-				'...\n' +
-				'</html>\n' +
-				'```\n' +
-				'CodeAlloy will automatically parse this block, write the file to the workspace filesystem, and open it in the editor.\n' +
-				'Always provide complete, working code without truncation. Keep conversational explanations brief.';
-		}
+			'You are CodeAlloy Agent, the autonomous engineering partner embedded directly in the CodeAlloy IDE.\n' +
+			'You have direct, full capability to forge files and execute terminal commands in the workspace.\n\n' +
+			'STRICT OPERATING RULES:\n' +
+			'1. NEVER give tutorials, step-by-step numbered guides, or tell the user how to do something (e.g., NEVER say "Here is how you can...", "1. Create the folder: mkdir", "2. Run cd", etc.).\n' +
+			'2. YOU MUST EXECUTE ALL ACTIONS AUTONOMOUSLY:\n' +
+			'   - To create or modify files, output:\n' +
+			'     ```file:<relative_path>\n' +
+			'     <complete code content>\n' +
+			'     ```\n' +
+			'   - To run terminal commands (e.g. creating virtual environments, installing dependencies, creating directories), output:\n' +
+			'     ```bash:run\n' +
+			'     <shell command>\n' +
+			'     ```\n' +
+			'3. For example, if instructed: "create a new folder called api and create in it a virtual environment and a fast api shell", you MUST output:\n' +
+			'   ```bash:run\n' +
+			'   mkdir -p api && python3 -m venv api/.venv\n' +
+			'   ```\n' +
+			'   ```file:api/main.py\n' +
+			'   from fastapi import FastAPI\n\n' +
+			'   app = FastAPI(title="FastAPI Shell")\n\n' +
+			'   @app.get("/")\n' +
+			'   def read_root():\n' +
+			'       return {"status": "online", "message": "FastAPI service running"}\n' +
+			'   ```\n' +
+			'   ```file:api/requirements.txt\n' +
+			'   fastapi>=0.110.0\n' +
+			'   uvicorn>=0.28.0\n' +
+			'   ```\n' +
+			'4. CodeAlloy will automatically parse and execute every command and write every file directly to disk.\n' +
+			'5. Keep conversational dialogue to a single brief sentence.';
 
 		const apiMessages = [
 			{

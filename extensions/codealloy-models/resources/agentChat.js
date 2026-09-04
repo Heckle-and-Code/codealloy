@@ -179,13 +179,18 @@
 				const rawTag = (match[1] || '').trim();
 
 				// If this block represents a file being forged on disk, do NOT dump the code into the chat!
-				if (rawTag.startsWith('file:') || rawTag.startsWith('write:') || rawTag.startsWith('create:') || rawTag.includes(':')) {
+				if (rawTag.startsWith('file:') || rawTag.startsWith('write:') || rawTag.startsWith('create:') || (rawTag.includes(':') && !rawTag.includes('run'))) {
 					const fileName = rawTag.includes(':') ? rawTag.split(':').slice(1).join(':').trim() : rawTag;
 					const statusText = isStreaming
 						? '<strong>Forging file:</strong> <code>' + escapeHtml(fileName) + '</code> &bull; <em>Streaming code to disk...</em>'
 						: '<strong>Created file:</strong> <code>' + escapeHtml(fileName) + '</code>';
 					html += '<div class="file-action-badge ' + (isStreaming ? 'forging' : 'created') + '" data-file="' + escapeHtml(fileName) + '" onclick="vscode.postMessage({ type: \'openFile\', path: \'' + escapeHtml(fileName) + '\' })">' +
 						'<span class="file-icon">' + (isStreaming ? '🔥' : '📄') + '</span> <span>' + statusText + '</span>' +
+					'</div>';
+				} else if (rawTag === 'bash:run' || rawTag === 'sh:run' || rawTag === 'terminal:run' || rawTag === 'bash' || rawTag === 'sh') {
+					const cmd = match[2].trim();
+					html += '<div class="file-action-badge forging" data-cmd="' + escapeHtml(cmd) + '">' +
+						'<span class="file-icon">⚡</span> <span><strong>Executing:</strong> <code>' + escapeHtml(cmd) + '</code></span>' +
 					'</div>';
 				} else {
 					// Clean snippet display with zero buttons
@@ -427,6 +432,24 @@
 						vscode.postMessage({ type: 'openFile', path: message.filePath });
 					};
 					chip.innerHTML = '<span class="file-icon">✓</span> <span><strong>Created &amp; Opened:</strong> <code>' + escapeHtml(message.fileName) + '</code> &bull; <span class="file-size">' + escapeHtml(message.filePath) + '</span></span>';
+					messagesContainer.scrollTop = messagesContainer.scrollHeight;
+				}
+				break;
+			}
+
+			case 'commandCompleted': {
+				const asstDiv = document.getElementById(message.assistantMsgId) ||
+				                pendingAssistantTurnEl ||
+				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
+				if (asstDiv) {
+					let chip = asstDiv.querySelector('.file-action-badge[data-cmd="' + message.command + '"]');
+					if (!chip) {
+						chip = document.createElement('div');
+						chip.className = 'file-action-badge ' + (message.success ? 'created' : '');
+						asstDiv.appendChild(chip);
+					}
+					chip.className = 'file-action-badge ' + (message.success ? 'created' : '');
+					chip.innerHTML = '<span class="file-icon">' + (message.success ? '✓' : '✗') + '</span> <span><strong>' + (message.success ? 'Executed:' : 'Failed:') + '</strong> <code>' + escapeHtml(message.command) + '</code></span>';
 					messagesContainer.scrollTop = messagesContainer.scrollHeight;
 				}
 				break;
