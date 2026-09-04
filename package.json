@@ -1,0 +1,20 @@
+{
+  "name": "codealloy",
+  "version": "0.1.0-alpha.1",
+  "description": "Where developer intent meets open models - An open-model-native autonomous IDE",
+  "private": true,
+  "author": "Heckle and Code",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git@github-org:Heckle-and-Code/codealloy.git"
+  },
+  "scripts": {
+    "bootstrap": "bash ./scripts/bootstrap.sh",
+    "dev": "bash ./scripts/dev.sh",
+    "package": "bash ./scripts/package.sh"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}

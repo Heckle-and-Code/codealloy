@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <radialGradient id="moltenCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FFF0B3" />
+      <stop offset="35%" stop-color="#FF9E00" />
+      <stop offset="75%" stop-color="#FF5500" />
+      <stop offset="100%" stop-color="#B82800" />
+    </radialGradient>
+    <linearGradient id="titaniumLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4B5162" />
+      <stop offset="50%" stop-color="#2D313B" />
+      <stop offset="100%" stop-color="#1A1D24" />
+    </linearGradient>
+    <linearGradient id="titaniumDark" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#252932" />
+      <stop offset="100%" stop-color="#0E1014" />
+    </linearGradient>
+    <linearGradient id="cyanGlow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00E5FF" />
+      <stop offset="100%" stop-color="#0099FF" />
+    </linearGradient>
+    <filter id="coreGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background Shield / Squircle -->
+  <rect width="512" height="512" rx="112" fill="#121316" />
+  <rect x="8" y="8" width="496" height="496" rx="104" fill="none" stroke="#252932" stroke-width="4" />
+
+  <!-- Molten Core (Radiant Heat) -->
+  <polygon points="256,120 380,336 132,336" fill="url(#moltenCore)" filter="url(#coreGlow)" opacity="0.95" />
+
+  <!-- Outer Alloy Facet (C-Facet) -->
+  <path d="M 180,96 L 332,96 L 416,240 L 372,316 L 320,316 L 380,240 L 312,144 L 200,144 L 140,248 L 200,352 L 312,352 L 340,400 L 180,400 L 96,256 Z" 
+        fill="url(#titaniumLight)" stroke="#5B6275" stroke-width="3" />
+
+  <!-- Interlocking Anvil A-Facet -->
+  <path d="M 256,160 L 348,320 L 296,320 L 276,280 L 236,280 L 216,320 L 164,320 Z M 256,230 L 244,256 L 268,256 Z" 
+        fill="url(#titaniumDark)" stroke="#3A3F4D" stroke-width="3" />
+
+  <!-- Cyan Circuit Accent Lines -->
+  <path d="M 140,248 L 100,248 M 380,240 L 420,240 M 256,120 L 256,80 M 200,400 L 256,400 L 256,432" 
+        fill="none" stroke="url(#cyanGlow)" stroke-width="6" stroke-linecap="round" />
+  <circle cx="100" cy="248" r="5" fill="#00E5FF" />
+  <circle cx="420" cy="240" r="5" fill="#00E5FF" />
+  <circle cx="256" cy="80" r="5" fill="#00E5FF" />
+  <circle cx="256" cy="432" r="5" fill="#00E5FF" />
+</svg>

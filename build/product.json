@@ -1,0 +1,32 @@
+{
+  "nameShort": "CodeAlloy",
+  "nameLong": "CodeAlloy",
+  "applicationName": "codealloy",
+  "dataFolderName": ".codealloy",
+  "win32AppUserModelId": "HeckleAndCode.CodeAlloy",
+  "win32MutexName": "codealloy",
+  "darwinBundleIdentifier": "com.heckleandcode.codealloy",
+  "linuxIconName": "codealloy",
+  "licenseName": "MIT",
+  "licenseUrl": "https://github.com/Heckle-and-Code/codealloy/blob/main/LICENSE",
+  "reportIssueUrl": "https://github.com/Heckle-and-Code/codealloy/issues",
+  "urlProtocol": "codealloy",
+  "extensionsGallery": {
+    "serviceUrl": "https://open-vsx.org/vscode/gallery",
+    "itemUrl": "https://open-vsx.org/vscode/item",
+    "resourceDownloadUrlTemplate": "https://open-vsx.org/vscode/unpkg/{publisher}/{name}/{version}/{path}"
+  },
+  "enableTelemetry": false,
+  "telemetryConfiguration": {
+    "default": false
+  },
+  "linkProtectionTrustedDomains": [
+    "https://open-vsx.org",
+    "https://github.com",
+    "https://ollama.com"
+  ],
+  "configurationDefaults": {
+    "workbench.colorTheme": "Default Dark Modern",
+    "telemetry.telemetryLevel": "off"
+  }
+}

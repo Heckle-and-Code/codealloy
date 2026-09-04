@@ -8,7 +8,7 @@ yarn-error.log*
 # Build outputs & packaging
 dist/
 out/
-build/
+.build/
 release/
 *.vsix
 *.dmg
