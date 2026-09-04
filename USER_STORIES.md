@@ -48,35 +48,41 @@ The CodeAlloy desktop shell is bootstrapped from Code-OSS v1.96.4, branded with 
 
 ---
 
-## Epic 1: Dynamic Model Discovery & Ollama Integration
+## Epic 1: Embedded Local Inference Engine & Model Picker
 
-### US-1.1: Automatic Discovery of Local Ollama Models
-* **User Story**: As a developer running Ollama on my workstation, I want CodeAlloy to automatically detect my running Ollama instance and discover all locally installed models on launch, so that I don't have to manually configure ports or type model names.
-* **Acceptance Criteria**:
-  * **AC 1.1.1**: When CodeAlloy starts up, the sidecar daemon sends a request to `http://localhost:11434/api/tags`.
-  * **AC 1.1.2**: If the response is successful (HTTP 200), the model selector dropdown is dynamically populated with the returned model tags (e.g., `qwen2.5-coder:14b`, `deepseek-r1:8b`).
-  * **AC 1.1.3**: If Ollama is not running, the UI displays a non-blocking subtle status icon: *"Ollama not detected"*, with a 1-click option to *"Retry Connection"* or *"Launch Ollama"*.
+CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle (~20MB, native Apple Silicon Metal and CUDA acceleration). Users do not need to install Ollama, Python, Docker, or external tools to run local models.
 
-### US-1.2: Pulling Models from Command Palette (`Cmd+Shift+P`)
-* **User Story**: As a developer, I want to pull any model tag from the Ollama library directly from the VS Code Command Palette without switching to a terminal, so that I can install and test new models seamlessly.
+### US-1.1: Embedded Engine & Local Model Discovery
+* **User Story**: As a developer, I want CodeAlloy to run local models out of the box using an embedded native inference engine without having to install external tools, and discover all local `.gguf` models on launch.
 * **Acceptance Criteria**:
-  * **AC 1.2.1**: Pressing `Cmd+Shift+P` (or `Ctrl+Shift+P`) and typing `CodeAlloy: Pull / Download Ollama Model` opens an input box with autocomplete for trending models (`qwen2.5-coder:7b`, `qwen2.5-coder:14b`, `deepseek-r1:14b`, `gemma2:9b`) and freeform text input.
-  * **AC 1.2.2**: When a model is selected, CodeAlloy initiates a streaming POST request to `/api/pull`.
-  * **AC 1.2.3**: Download progress percentage and layer status are displayed in the status bar with an active progress bar and an option to cancel.
-  * **AC 1.2.4**: Upon completion, a notification appears: *"Model <tag> downloaded successfully"*, and the active model is optionally set to the new download.
+  * **AC 1.1.1**: CodeAlloy discovers all models installed in `~/.codealloy/models/` on startup.
+  * **AC 1.1.2**: The bottom status bar features a **Model Selector Dial** (`⚡ CodeAlloy: <model-name>`) showing the currently active local model.
+  * **AC 1.1.3**: Clicking the Model Selector opens a QuickPick listing all installed models with parameters, file sizes, and quantization.
+  * **AC 1.1.4**: Users can select "Add Local GGUF Model..." to point to any model already on their filesystem.
 
-### US-1.3: Hardware-Aware Welcome Screen Onboarding
-* **User Story**: As a first-time user, I want the Welcome screen to examine my machine's RAM and VRAM to recommend the right model size, so that I don't accidentally pull a 70B model that freezes my 16GB laptop.
+### US-1.2: 1-Click In-App Model Download & Management
+* **User Story**: As a developer, I want to download curated open coding models directly inside CodeAlloy with 1 click from the Command Palette or Welcome screen, so that I don't have to use external tools or search Hugging Face manually.
 * **Acceptance Criteria**:
-  * **AC 1.3.1**: On first launch, the Welcome Screen queries OS memory specs (e.g., `os.totalmem()` and GPU detection).
-  * **AC 1.3.2**: Devices with $\le$ 16GB RAM are recommended 7B–9B models (e.g. `Qwen 2.5 Coder 7B`); devices with 32GB RAM are recommended 14B models; devices with 64GB+ or dedicated high-VRAM GPUs are recommended 32B+ models.
-  * **AC 1.3.3**: The welcome screen provides a single primary button: **"Download Recommended Model"** which triggers the download in one click.
+  * **AC 1.2.1**: A curated catalog of top-tier coding models is provided out of the box:
+    - `Qwen 2.5 Coder 1.5B` (Lightweight / 8GB RAM laptops)
+    - `Qwen 2.5 Coder 7B` (Recommended balance / 16GB RAM)
+    - `Qwen 2.5 Coder 14B` (High capability / 32GB RAM)
+    - `DeepSeek R1 Distill 7B / 14B` (Reasoning & complex architecture)
+  * **AC 1.2.2**: Selecting a model downloads the quantized GGUF directly into `~/.codealloy/models/` with streaming download progress in the status bar.
+  * **AC 1.2.3**: Upon completion, the model is automatically verified, loaded into the embedded engine, and set as active.
 
-### US-1.4: Dynamic Model Fallback on OOM
-* **User Story**: As a developer running local models, I want CodeAlloy to automatically fall back to a smaller backup model if a larger model triggers an Out-Of-Memory (OOM) error, so that my active agent turn doesn't crash.
+### US-1.3: Hardware-Aware Memory Prober & Recommendation
+* **User Story**: As a first-time user, I want CodeAlloy to examine my machine's Unified Memory / VRAM and recommend the optimal model size, so that my system doesn't run out of memory.
 * **Acceptance Criteria**:
-  * **AC 1.4.1**: Users can configure a fallback precedence chain in settings (e.g., `qwen2.5-coder:32b` $\to$ `qwen2.5-coder:14b` $\to$ `qwen2.5-coder:7b`).
-  * **AC 1.4.2**: If the backend returns a 500 error containing "out of memory" or context-length exhaustion, the agent logs a warning, falls back to the next model in the chain, and continues execution seamlessly.
+  * **AC 1.3.1**: On startup, CodeAlloy queries available system RAM and GPU architecture.
+  * **AC 1.3.2**: Machines with $\le$ 16GB memory are recommended 1.5B–7B models; machines with 32GB+ are recommended 14B models.
+  * **AC 1.3.3**: The UI warns before loading any model that exceeds 80% of available memory.
+
+### US-1.4: Hybrid External Endpoint Support (Ollama / vLLM / Remote)
+* **User Story**: As a developer who already has a dedicated GPU workstation or remote vLLM server, I want to optionally connect CodeAlloy to an external endpoint instead of the embedded engine.
+* **Acceptance Criteria**:
+  * **AC 1.4.1**: Users can toggle between "Embedded Local Engine" and "External Endpoint" in settings.
+  * **AC 1.4.2**: The external provider supports standard OpenAI-compatible `/v1/chat/completions` and Ollama endpoints.
 
 ---
 
