@@ -135,7 +135,7 @@ export class LlamaServerService {
 			'-ngl', '99', // GPU offload: Metal on Mac, CUDA/Vulkan on Windows/Linux (auto falls back if CPU-only)
 			'-c', '8192', // 8k context window
 			'-t', String(threadCount),
-			'--flash-attn'
+			'--flash-attn', 'on'
 		];
 
 		this.outputChannel.appendLine(`[Engine] Platform: ${process.platform} (${process.arch})`);
