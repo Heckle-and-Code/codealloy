@@ -60,7 +60,7 @@ CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle 
   * **AC 1.1.3**: Clicking the Model Selector opens a QuickPick listing all installed models with parameters, file sizes, and quantization.
   * **AC 1.1.4**: Users can select "Add Local GGUF Model..." to point to any model already on their filesystem.
 
-### US-1.2: 1-Click In-App Model Download & Management
+### US-1.2: 1-Click In-App Model Download & Management `[COMPLETED]`
 * **User Story**: As a developer, I want to download curated open coding models directly inside CodeAlloy with 1 click from the Command Palette or Welcome screen, so that I don't have to use external tools or search Hugging Face manually.
 * **Acceptance Criteria**:
   * **AC 1.2.1**: A curated catalog of top-tier coding models is provided out of the box:
