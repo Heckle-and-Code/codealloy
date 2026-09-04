@@ -28,9 +28,8 @@
   "configurationDefaults": {
     "workbench.colorTheme": "Default Dark Modern",
     "telemetry.telemetryLevel": "off",
-    "window.titleBarStyle": "custom",
-    "window.commandCenter": true,
-    "workbench.layoutControl.enabled": true,
+    "window.titleBarStyle": "native",
+    "security.workspace.trust.enabled": false,
     "workbench.activityBar.location": "default",
     "workbench.statusBar.visible": true
   }
