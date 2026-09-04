@@ -6,6 +6,7 @@ import { LlamaServerService } from './llamaServerService';
 import { AgentChatViewProvider } from './agentChatViewProvider';
 
 let modelStatusBarItem: vscode.StatusBarItem;
+let chatStatusBarItem: vscode.StatusBarItem;
 let modelManager: LocalModelManager;
 let llamaServer: LlamaServerService;
 let chatProvider: AgentChatViewProvider;
@@ -14,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
 	modelManager = new LocalModelManager();
 	llamaServer = LlamaServerService.getInstance();
 
-	// 1. Create Model Selector Status Bar Item
+	// 1. Create Model Selector & Chat Status Bar Items
 	modelStatusBarItem = vscode.window.createStatusBarItem(
 		'codealloy.modelSelector',
 		vscode.StatusBarAlignment.Right,
@@ -22,6 +23,17 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 	modelStatusBarItem.command = 'codealloy.selectModel';
 	context.subscriptions.push(modelStatusBarItem);
+
+	chatStatusBarItem = vscode.window.createStatusBarItem(
+		'codealloy.chatButton',
+		vscode.StatusBarAlignment.Right,
+		101
+	);
+	chatStatusBarItem.text = '$(comment-discussion) Agent Chat';
+	chatStatusBarItem.tooltip = 'Click to open CodeAlloy Agent Chat Panel';
+	chatStatusBarItem.command = 'codealloy.focusChat';
+	chatStatusBarItem.show();
+	context.subscriptions.push(chatStatusBarItem);
 
 	// 2. Register Agent Chat View Provider
 	chatProvider = new AgentChatViewProvider(context.extensionUri, modelManager, llamaServer);
@@ -56,8 +68,12 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('codealloy.focusChat', () => {
-			vscode.commands.executeCommand('codealloy.agentView.focus');
+		vscode.commands.registerCommand('codealloy.focusChat', async () => {
+			try {
+				await vscode.commands.executeCommand('codealloy.agentView.focus');
+			} catch {
+				await vscode.commands.executeCommand('workbench.view.extension.codealloy-agent-panel');
+			}
 		})
 	);
 
@@ -291,5 +307,8 @@ export function deactivate() {
 	}
 	if (modelStatusBarItem) {
 		modelStatusBarItem.dispose();
+	}
+	if (chatStatusBarItem) {
+		chatStatusBarItem.dispose();
 	}
 }

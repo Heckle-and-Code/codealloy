@@ -12,7 +12,8 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onView:codealloy.agentView"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -39,7 +40,7 @@
       },
       {
         "command": "codealloy.focusChat",
-        "title": "CodeAlloy: Focus Agent Chat",
+        "title": "CodeAlloy: Open / Focus Agent Chat",
         "category": "CodeAlloy"
       }
     ],
@@ -48,7 +49,7 @@
         {
           "id": "codealloy-agent-panel",
           "title": "CodeAlloy Agent",
-          "icon": "resources/anvil-flame.svg"
+          "icon": "$(flame)"
         }
       ]
     },
