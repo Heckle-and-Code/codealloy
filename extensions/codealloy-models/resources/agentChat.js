@@ -181,8 +181,11 @@
 				// If this block represents a file being forged on disk, do NOT dump the code into the chat!
 				if (rawTag.startsWith('file:') || rawTag.startsWith('write:') || rawTag.startsWith('create:') || rawTag.includes(':')) {
 					const fileName = rawTag.includes(':') ? rawTag.split(':').slice(1).join(':').trim() : rawTag;
-					html += '<div class="file-action-badge" onclick="vscode.postMessage({ type: \'openFile\', path: \'' + escapeHtml(fileName) + '\' })">' +
-						'<span class="file-icon">📄</span> <span><strong>Created file:</strong> <code>' + escapeHtml(fileName) + '</code> &bull; <em>Opened in editor</em></span>' +
+					const statusText = isStreaming
+						? '<strong>Forging file:</strong> <code>' + escapeHtml(fileName) + '</code> &bull; <em>Streaming code to disk...</em>'
+						: '<strong>Created file:</strong> <code>' + escapeHtml(fileName) + '</code>';
+					html += '<div class="file-action-badge ' + (isStreaming ? 'forging' : 'created') + '" data-file="' + escapeHtml(fileName) + '" onclick="vscode.postMessage({ type: \'openFile\', path: \'' + escapeHtml(fileName) + '\' })">' +
+						'<span class="file-icon">' + (isStreaming ? '🔥' : '📄') + '</span> <span>' + statusText + '</span>' +
 					'</div>';
 				} else {
 					// Clean snippet display with zero buttons
@@ -411,16 +414,19 @@
 				                pendingAssistantTurnEl ||
 				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
 				if (asstDiv) {
-					let chip = asstDiv.querySelector('.file-action-badge');
+					let chip = asstDiv.querySelector('.file-action-badge[data-file="' + message.fileName + '"]') ||
+					           asstDiv.querySelector('.file-action-badge');
 					if (!chip) {
 						chip = document.createElement('div');
-						chip.className = 'file-action-badge';
+						chip.className = 'file-action-badge created';
 						asstDiv.appendChild(chip);
 					}
+					chip.className = 'file-action-badge created';
+					chip.setAttribute('data-file', message.fileName);
 					chip.onclick = function() {
 						vscode.postMessage({ type: 'openFile', path: message.filePath });
 					};
-					chip.innerHTML = '<span class="file-icon">📄</span> <span><strong>Created file:</strong> <code>' + escapeHtml(message.fileName) + '</code> &bull; <span class="file-size">' + escapeHtml(message.filePath) + '</span></span>';
+					chip.innerHTML = '<span class="file-icon">✓</span> <span><strong>Created &amp; Opened:</strong> <code>' + escapeHtml(message.fileName) + '</code> &bull; <span class="file-size">' + escapeHtml(message.filePath) + '</span></span>';
 					messagesContainer.scrollTop = messagesContainer.scrollHeight;
 				}
 				break;

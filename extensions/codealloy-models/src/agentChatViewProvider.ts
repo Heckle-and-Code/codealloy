@@ -1111,6 +1111,23 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			transition: all 0.15s ease;
 		}
 
+		.file-action-badge.forging {
+			background: rgba(255, 107, 0, 0.08);
+			border-color: rgba(255, 107, 0, 0.4);
+			color: var(--ca-gold) !important;
+			animation: forgePulse 1.5s infinite ease-in-out;
+		}
+
+		.file-action-badge.forging strong {
+			color: var(--ca-gold) !important;
+		}
+
+		.file-action-badge.created {
+			background: rgba(78, 189, 121, 0.12);
+			border-color: rgba(78, 189, 121, 0.4);
+			color: #4EBD79 !important;
+		}
+
 		.file-action-badge:hover {
 			background: rgba(78, 189, 121, 0.22);
 			border-color: var(--ca-success);
