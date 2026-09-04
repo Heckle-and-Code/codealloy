@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs & packaging
+dist/
+out/
+build/
+release/
+*.vsix
+*.dmg
+*.zip
+*.AppImage
+*.deb
+*.rpm
+*.exe
+
+# CodeAlloy local metadata & shadow stores
+.codealloy/
+*.sqlite
+*.sqlite-journal
+*.db
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Environment & Secret files
+.env
+.env.local
+.env.*.local
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+.vscode-test/
+
+# Temporary and log files
+logs/
+*.log
+scratch/
