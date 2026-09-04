@@ -269,7 +269,8 @@ async function showModelPicker(): Promise<void> {
 	});
 
 	const selected = await vscode.window.showQuickPick(items, {
-		placeHolder: active ? `Active Model: ${active} — Switch or download models` : 'Select or download a local model'
+		placeHolder: active ? `Active Model: ${active} — Switch or download models` : 'Select or download a local model',
+		ignoreFocusOut: true
 	});
 
 	if (!selected) return;

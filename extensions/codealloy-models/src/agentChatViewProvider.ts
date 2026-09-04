@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
+import * as path from 'path';
 import { LocalModelManager } from './modelManager';
 import { LlamaServerService } from './llamaServerService';
 
@@ -135,15 +136,38 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		const activeModel = this._modelManager.getActiveModel();
 		const serverStatus = this._llamaServer.getStatus();
 
-		if (!activeModel || !serverStatus.running) {
+		if (!activeModel) {
 			if (this._view) {
 				this._view.webview.postMessage({
 					type: 'showNotice',
 					level: 'error',
-					message: 'No active local model is loaded in the inference engine. Click below to select or download a model.'
+					message: 'No model selected. Click the flame badge or select a model to begin.'
 				});
 			}
 			return;
+		}
+
+		if (!serverStatus.running) {
+			const fullPath = path.join(this._modelManager.getModelsDirectory(), activeModel);
+			if (this._view) {
+				this._view.webview.postMessage({
+					type: 'showNotice',
+					level: 'info',
+					message: `Igniting Apple Silicon Metal GPU engine for "${activeModel}"...`
+				});
+			}
+			const started = await this._llamaServer.start(fullPath);
+			if (!started) {
+				if (this._view) {
+					this._view.webview.postMessage({
+						type: 'showNotice',
+						level: 'error',
+						message: `Failed to start inference engine for "${activeModel}". Check Output > CodeAlloy Inference Engine.`
+					});
+				}
+				return;
+			}
+			this.syncState();
 		}
 
 		// Push User Message
@@ -456,6 +480,49 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			line-height: 1.4;
 		}
 
+		.prompt-chips {
+			display: flex;
+			flex-direction: column;
+			gap: 6px;
+			margin-top: 10px;
+			width: 100%;
+			text-align: left;
+		}
+
+		.chip-btn {
+			background: var(--ca-code-bg);
+			border: 1px solid var(--ca-border);
+			color: var(--ca-text-primary);
+			border-radius: 5px;
+			padding: 7px 10px;
+			font-size: 11px;
+			text-align: left;
+			cursor: pointer;
+			transition: all 0.15s ease;
+			display: flex;
+			align-items: center;
+			gap: 6px;
+		}
+
+		.chip-btn:hover {
+			border-color: var(--ca-amber);
+			background: rgba(255, 107, 0, 0.08);
+			color: var(--ca-gold);
+		}
+
+		.model-tag {
+			display: inline-block;
+			background: rgba(78, 189, 121, 0.15);
+			color: var(--ca-success);
+			border: 1px solid rgba(78, 189, 121, 0.3);
+			padding: 2px 7px;
+			border-radius: 3px;
+			font-size: 10.5px;
+			font-weight: 600;
+			margin: 4px 0;
+			word-break: break-all;
+		}
+
 		.btn-primary {
 			background: var(--ca-amber);
 			color: #0E0F12;
@@ -708,12 +775,12 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 	<!-- Scrollable Messages Container -->
 	<div class="messages-container" id="messagesContainer">
 		<div class="empty-state" id="emptyState">
-			<div class="empty-flame">&#9889;</div>
-			<div class="empty-title">CodeAlloy Forge Agent</div>
-			<div class="empty-desc">
-				Connected directly to your embedded local inference engine. Ask questions, generate routines, or refactor modules.
+			<div class="empty-flame" id="emptyFlame">&#128293;</div>
+			<div class="empty-title" id="emptyTitle">CodeAlloy Forge Agent</div>
+			<div class="empty-desc" id="emptyDesc">
+				Connecting to local inference engine...
 			</div>
-			<button class="btn-primary" id="selectModelBtn">Select Model</button>
+			<div id="emptyActions"></div>
 		</div>
 	</div>
 
@@ -737,13 +804,16 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		const modelNameEl = document.getElementById('modelName');
 		const statusDotEl = document.getElementById('statusDot');
 		const modelBadgeEl = document.getElementById('modelBadge');
-		const selectModelBtn = document.getElementById('selectModelBtn');
 		const clearBtn = document.getElementById('clearBtn');
 		const promptInput = document.getElementById('promptInput');
 		const sendBtn = document.getElementById('sendBtn');
 		const stopBtn = document.getElementById('stopBtn');
 		const messagesContainer = document.getElementById('messagesContainer');
 		const emptyState = document.getElementById('emptyState');
+		const emptyFlame = document.getElementById('emptyFlame');
+		const emptyTitle = document.getElementById('emptyTitle');
+		const emptyDesc = document.getElementById('emptyDesc');
+		const emptyActions = document.getElementById('emptyActions');
 		const autonomyDial = document.getElementById('autonomyDial');
 
 		let isStreaming = false;
@@ -762,12 +832,18 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			});
 		});
 
-		modelBadgeEl.addEventListener('click', () => {
+		window.triggerSelectModel = function() {
 			vscode.postMessage({ type: 'selectModel' });
-		});
+		};
 
-		selectModelBtn.addEventListener('click', () => {
-			vscode.postMessage({ type: 'selectModel' });
+		window.sendQuickPrompt = function(promptText) {
+			if (isStreaming) return;
+			promptInput.value = '';
+			vscode.postMessage({ type: 'sendMessage', prompt: promptText });
+		};
+
+		modelBadgeEl.addEventListener('click', () => {
+			window.triggerSelectModel();
 		});
 
 		clearBtn.addEventListener('click', () => {
@@ -898,19 +974,49 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 			switch (message.type) {
 				case 'syncState': {
-					if (message.activeModel) {
+					if (message.activeModel && message.serverRunning) {
 						modelNameEl.textContent = message.activeModel;
-						if (message.serverRunning) {
-							statusDotEl.className = 'status-dot';
-							modelBadgeEl.title = \`Active: \${message.activeModel} (Metal GPU Engine online)\`;
-						} else {
-							statusDotEl.className = 'status-dot offline';
-							modelBadgeEl.title = \`Active: \${message.activeModel} (Engine standby)\`;
+						statusDotEl.className = 'status-dot';
+						modelBadgeEl.title = 'Active: ' + message.activeModel + ' (Metal GPU Engine online)';
+
+						if (emptyTitle && emptyDesc && emptyActions) {
+							emptyFlame.textContent = '🔥';
+							emptyTitle.innerHTML = 'Forge Agent Ready';
+							emptyDesc.innerHTML = '<span class="model-tag">' + escapeHtml(message.activeModel) + '</span><br><span style="margin-top: 4px; display: inline-block;">Local Metal GPU engine is active and private. Ask questions or click a quick prompt below:</span>';
+							emptyActions.innerHTML = '<div class="prompt-chips">' +
+								'<button class="chip-btn" onclick="sendQuickPrompt(\\'Explain how this project is structured and what it does\\')">&#9889; Explain project architecture</button>' +
+								'<button class="chip-btn" onclick="sendQuickPrompt(\\'Write unit tests for the active code with edge cases\\')">&#128736; Generate unit tests</button>' +
+								'<button class="chip-btn" onclick="sendQuickPrompt(\\'Refactor the active code for better performance and readability\\')">&#10024; Refactor and optimize</button>' +
+								'</div>' +
+								'<div style="margin-top: 10px;">' +
+								'<button class="clear-btn" onclick="triggerSelectModel()" style="text-decoration: underline;">Switch model...</button>' +
+								'</div>';
+						}
+					} else if (message.activeModel) {
+						modelNameEl.textContent = message.activeModel;
+						statusDotEl.className = 'status-dot offline';
+						modelBadgeEl.title = 'Active: ' + message.activeModel + ' (Engine standby)';
+
+						if (emptyTitle && emptyDesc && emptyActions) {
+							emptyFlame.textContent = '⚡';
+							emptyTitle.innerHTML = 'Model Ready (Standby)';
+							emptyDesc.innerHTML = '<span class="model-tag">' + escapeHtml(message.activeModel) + '</span><br><span style="margin-top: 4px; display: inline-block;">Click below or send a prompt to ignite the local engine:</span>';
+							emptyActions.innerHTML = '<button class="btn-primary" onclick="sendQuickPrompt(\\'Hello CodeAlloy! Confirm engine is online.\\')">&#128293; Ignite Local Engine</button>' +
+								'<div style="margin-top: 10px;">' +
+								'<button class="clear-btn" onclick="triggerSelectModel()" style="text-decoration: underline;">Switch model...</button>' +
+								'</div>';
 						}
 					} else {
 						modelNameEl.textContent = 'No Model Active';
 						statusDotEl.className = 'status-dot offline';
 						modelBadgeEl.title = 'Click to select or download a local model';
+
+						if (emptyTitle && emptyDesc && emptyActions) {
+							emptyFlame.textContent = '❄️';
+							emptyTitle.innerHTML = 'No Local Model Active';
+							emptyDesc.innerHTML = 'Pick an installed GGUF model or download an open coding model (Qwen 2.5 Coder, DeepSeek R1) with 1 click.';
+							emptyActions.innerHTML = '<button class="btn-primary" onclick="triggerSelectModel()">Select or Download Model</button>';
+						}
 					}
 
 					if (message.autonomyLevel) {
