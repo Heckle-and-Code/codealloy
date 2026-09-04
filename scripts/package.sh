@@ -18,19 +18,19 @@ case "${UNAME_OUT}" in
         ARCH="$(uname -m)"
         if [ "${ARCH}" = "arm64" ]; then
             echo "  Building macOS Apple Silicon (arm64)..."
-            yarn gulp vscode-darwin-arm64
+            npx gulp vscode-darwin-arm64
         else
             echo "  Building macOS Intel (x64)..."
-            yarn gulp vscode-darwin-x64
+            npx gulp vscode-darwin-x64
         fi
         ;;
     Linux*)
         echo "  Building Linux..."
-        yarn gulp vscode-linux-x64
+        npx gulp vscode-linux-x64
         ;;
     CYGWIN*|MINGW*|MSYS*)
         echo "  Building Windows..."
-        yarn gulp vscode-win32-x64
+        npx gulp vscode-win32-x64
         ;;
     *)
         echo "❌ Unsupported operating system: ${UNAME_OUT}"

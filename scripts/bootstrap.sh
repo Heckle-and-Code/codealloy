@@ -26,11 +26,11 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 echo "  ✓ node: $(node -v)"
 
-if ! command -v yarn >/dev/null 2>&1; then
-    echo "❌ Error: yarn is required but not installed."
+if ! command -v npm >/dev/null 2>&1; then
+    echo "❌ Error: npm is required but not installed."
     exit 1
 fi
-echo "  ✓ yarn: $(yarn -v)"
+echo "  ✓ npm: $(npm -v)"
 
 if ! command -v python3 >/dev/null 2>&1; then
     echo "❌ Error: python3 is required for native module compilation."
@@ -67,9 +67,9 @@ fi
 
 # 4. Dependency Installation
 echo ""
-echo "📥 Installing upstream dependencies (this may take a few minutes on first run)..."
+echo "📥 Installing upstream dependencies with npm (this may take a few minutes on first run)..."
 cd "${UPSTREAM_DIR}"
-yarn --ignore-engines
+npm ci || npm install
 
 echo ""
 echo "🎉 ========================================================"
