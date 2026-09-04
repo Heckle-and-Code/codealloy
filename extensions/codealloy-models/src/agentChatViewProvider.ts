@@ -229,16 +229,26 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		}
 
 		// 4. Prepare conversation context for /v1/chat/completions
+		// Filter out any incomplete or empty turns so the model never receives a trailing empty assistant turn
+		const history = this._messages
+			.filter((m) => m.id !== assistantMsgId && m.id !== userMsg.id && m.content.trim().length > 0)
+			.slice(-8)
+			.map((m) => ({
+				role: m.role,
+				content: m.content.trim()
+			}));
+
 		const apiMessages = [
 			{
 				role: 'system',
 				content:
 					'You are CodeAlloy Agent, an autonomous open-model coding partner embedded directly in the CodeAlloy IDE. You write concise, high-performance, production-ready code. Always specify language tags in markdown code fences. Keep explanations clear, precise, and directly actionable.'
 			},
-			...this._messages.slice(-8).map((m) => ({
-				role: m.role,
-				content: m.content
-			}))
+			...history,
+			{
+				role: 'user',
+				content: prompt.trim()
+			}
 		];
 
 		const requestBody = JSON.stringify({
@@ -299,6 +309,10 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 				res.on('end', () => {
 					this._activeRequest = undefined;
+					const trimmedContent = assistantMsg.content.trim();
+					if (!trimmedContent) {
+						assistantMsg.content = '*(No response content returned by local model. Please re-send or ignite the engine.)*';
+					}
 					const preview = assistantMsg.content.substring(0, 80).replace(/\n/g, ' ');
 					this._outputChannel.appendLine(`[AgentChat] Stream ended successfully (${assistantMsg.content.length} chars): "${preview}..."`);
 					if (this._view) {
