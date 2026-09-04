@@ -167,7 +167,7 @@
 	function renderMarkdown(raw) {
 		if (!raw) return '';
 		try {
-			const codeBlockRegex = /```([a-zA-Z0-9_\-]+)?\n([\s\S]*?)```/g;
+			const codeBlockRegex = /```([a-zA-Z0-9_\-\.\/:]+)?\n([\s\S]*?)```/g;
 			let html = '';
 			let lastIndex = 0;
 			let match;
@@ -176,13 +176,20 @@
 				const preceding = raw.substring(lastIndex, match.index);
 				html += renderTextParagraphs(preceding);
 
-				const lang = match[1] || 'code';
+				const rawTag = (match[1] || 'code').trim();
+				let displayHeader = escapeHtml(rawTag);
+				if (rawTag.includes(':')) {
+					const parts = rawTag.split(':');
+					const subPath = parts.slice(1).join(':').trim();
+					displayHeader = '📄 <strong>' + escapeHtml(subPath) + '</strong> (' + escapeHtml(parts[0] || 'file') + ')';
+				}
+
 				const codeContent = match[2];
 				const escaped = escapeHtml(codeContent);
 
 				html += '<div class="code-block">' +
 					'<div class="code-header">' +
-						'<span>' + escapeHtml(lang) + '</span>' +
+						'<span>' + displayHeader + '</span>' +
 						'<div class="code-actions">' +
 							'<button class="code-action-btn" onclick="insertCodeAtCursor(this)">Insert at Cursor</button>' +
 							'<button class="code-action-btn" onclick="copyCode(this)">Copy</button>' +
@@ -395,6 +402,23 @@
 					console.error('[AgentChat] Error handling streamEnd:', err);
 				} finally {
 					endStreamUI();
+				}
+				break;
+			}
+
+			case 'fileCreated': {
+				const asstDiv = document.getElementById(message.assistantMsgId) ||
+				                pendingAssistantTurnEl ||
+				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
+				if (asstDiv) {
+					const chip = document.createElement('div');
+					chip.className = 'file-action-badge';
+					chip.onclick = function() {
+						vscode.postMessage({ type: 'openFile', path: message.filePath });
+					};
+					chip.innerHTML = '<span class="file-icon">&#9889;</span> <span><strong>Created on filesystem:</strong> <code>' + escapeHtml(message.filePath) + '</code> <span class="file-size">(' + message.bytes + ' bytes)</span> &bull; <em>Click to reveal</em></span>';
+					asstDiv.appendChild(chip);
+					messagesContainer.scrollTop = messagesContainer.scrollHeight;
 				}
 				break;
 			}

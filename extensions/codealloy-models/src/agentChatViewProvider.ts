@@ -68,6 +68,9 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 				case 'insertAtCursor':
 					await this._insertAtCursor(data.text);
 					break;
+				case 'openFile':
+					await this._openFileInEditor(data.path);
+					break;
 				case 'selectModel':
 					await vscode.commands.executeCommand('codealloy.selectModel');
 					break;
@@ -144,6 +147,138 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		});
 
 		vscode.window.showInformationMessage('CodeAlloy: Inserted code at cursor.');
+	}
+
+	private async _openFileInEditor(filePath: string): Promise<void> {
+		try {
+			const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+			const targetUri = workspaceFolder ? vscode.Uri.joinPath(workspaceFolder, filePath) : vscode.Uri.file(path.resolve(filePath));
+			const doc = await vscode.workspace.openTextDocument(targetUri);
+			await vscode.window.showTextDocument(doc, { preview: false });
+		} catch (err: any) {
+			vscode.window.showErrorMessage(`CodeAlloy: Could not open "${filePath}": ${err?.message}`);
+		}
+	}
+
+	private async _executeFileAction(fileName: string, content: string, assistantMsgId: string): Promise<boolean> {
+		try {
+			const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
+			let targetUri: vscode.Uri;
+			if (workspaceFolder) {
+				targetUri = vscode.Uri.joinPath(workspaceFolder, fileName);
+			} else {
+				const activeDoc = vscode.window.activeTextEditor?.document.uri;
+				if (activeDoc && activeDoc.scheme === 'file') {
+					targetUri = vscode.Uri.joinPath(vscode.Uri.file(path.dirname(activeDoc.fsPath)), fileName);
+				} else {
+					targetUri = vscode.Uri.file(path.resolve(fileName));
+				}
+			}
+
+			// Ensure parent directory exists
+			const dirUri = vscode.Uri.file(path.dirname(targetUri.fsPath));
+			try {
+				await vscode.workspace.fs.createDirectory(dirUri);
+			} catch {}
+
+			// Write content to disk
+			await vscode.workspace.fs.writeFile(targetUri, Buffer.from(content, 'utf8'));
+			const relPath = vscode.workspace.asRelativePath(targetUri);
+			this._outputChannel.appendLine(`[AgentChat] Successfully wrote file to filesystem: ${targetUri.fsPath} (${content.length} bytes)`);
+
+			// Open file in active editor
+			const doc = await vscode.workspace.openTextDocument(targetUri);
+			await vscode.window.showTextDocument(doc, { preview: false });
+
+			vscode.window.showInformationMessage(`CodeAlloy Agent: Created "${path.basename(targetUri.fsPath)}" on filesystem.`);
+
+			// Notify webview with confirmation
+			if (this._view) {
+				this._view.webview.postMessage({
+					type: 'fileCreated',
+					assistantMsgId,
+					fileName: path.basename(targetUri.fsPath),
+					filePath: relPath,
+					bytes: content.length
+				});
+			}
+
+			return true;
+		} catch (err: any) {
+			this._outputChannel.appendLine(`[AgentChat Error writing file]: ${err?.message}`);
+			vscode.window.showErrorMessage(`CodeAlloy: Failed to write "${fileName}": ${err?.message}`);
+			return false;
+		}
+	}
+
+	private async _detectAndExecuteFiles(
+		prompt: string,
+		content: string,
+		assistantMsgId: string
+	): Promise<boolean> {
+		const isL2Plus = this._autonomyLevel === 'L2' || this._autonomyLevel === 'L3' || this._autonomyLevel === 'L4';
+		const hasFileCreationIntent =
+			/\b(create|make|write|generate|save|put)\b.*\b(file|script|module|routine)\b/i.test(prompt) ||
+			/\b(on the filesystem|to disk|in workspace)\b/i.test(prompt) ||
+			isL2Plus;
+
+		if (!hasFileCreationIntent) return false;
+
+		// 1. Check for explicit file fence: ```file:google.py or ```write_file:google.py or ```python:google.py
+		const explicitFenceRegex = /```(?:file|write|create|write_file|[a-zA-Z0-9_\-]+):([a-zA-Z0-9_\-\.\/]+)\n([\s\S]*?)```/g;
+		let match = explicitFenceRegex.exec(content);
+		if (match) {
+			const fileName = match[1].trim();
+			const fileContent = match[2];
+			if (fileName && fileContent) {
+				return await this._executeFileAction(fileName, fileContent, assistantMsgId);
+			}
+		}
+
+		// 2. Check for standard code block
+		const codeBlockRegex = /```([a-zA-Z0-9_\-]+)?\n([\s\S]*?)```/g;
+		const codeMatch = codeBlockRegex.exec(content);
+		if (!codeMatch) return false;
+
+		const codeContent = codeMatch[2];
+		const lang = (codeMatch[1] || '').toLowerCase();
+
+		// Extract filename from prompt or response (e.g. google.py)
+		const fileNameRegex = /\b([a-zA-Z0-9_\-]+\.(?:py|js|ts|jsx|tsx|json|html|css|sh|md|go|rs|cpp|c|h|java|rb|php|sql|ya?ml|toml))\b/gi;
+		let extractedName: string | undefined;
+
+		// First check prompt (e.g. "make a python file named google.py")
+		const promptMatches = Array.from(prompt.matchAll(fileNameRegex));
+		if (promptMatches.length > 0) {
+			extractedName = promptMatches[promptMatches.length - 1][1];
+		}
+
+		// Next check response text (e.g. "Save this file as google.py")
+		if (!extractedName) {
+			const responseMatches = Array.from(content.matchAll(fileNameRegex));
+			if (responseMatches.length > 0) {
+				extractedName = responseMatches[0][1];
+			}
+		}
+
+		// Fallback default filename if user requested a script/file of specific language
+		if (!extractedName) {
+			if (lang === 'python' || /\bpython\b/i.test(prompt)) {
+				extractedName = 'google.py';
+			} else if (lang === 'javascript' || /\bjavascript\b/i.test(prompt)) {
+				extractedName = 'index.js';
+			} else if (lang === 'typescript' || /\btypescript\b/i.test(prompt)) {
+				extractedName = 'index.ts';
+			} else if (lang) {
+				extractedName = `script.${lang}`;
+			}
+		}
+
+		if (extractedName && codeContent.trim().length > 0) {
+			return await this._executeFileAction(extractedName, codeContent, assistantMsgId);
+		}
+
+		return false;
 	}
 
 	private async _handleUserPrompt(prompt: string, incomingTurnId?: string): Promise<void> {
@@ -238,11 +373,36 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 				content: m.content.trim()
 			}));
 
+		let systemPrompt =
+			'You are CodeAlloy Agent, an autonomous open-model coding partner embedded directly in the CodeAlloy IDE. You write concise, high-performance, production-ready code. Always specify language tags in markdown code fences. Keep explanations clear, precise, and directly actionable.';
+
+		const isL2Plus = this._autonomyLevel === 'L2' || this._autonomyLevel === 'L3' || this._autonomyLevel === 'L4';
+		const hasFileIntent =
+			/\b(create|make|write|generate|save|put)\b.*\b(file|script|module|routine)\b/i.test(prompt) ||
+			/\b(on the filesystem|to disk|in workspace)\b/i.test(prompt);
+
+		if (isL2Plus || hasFileIntent) {
+			systemPrompt =
+				'You are CodeAlloy Agent, an autonomous open-model coding partner embedded directly in the CodeAlloy IDE.\n' +
+				'You have direct capability to forge and modify files on the workspace filesystem.\n' +
+				'When the user instructs you to create, write, or generate a file on the filesystem, you MUST declare the file in a code block with the target filename in the tag:\n' +
+				'```file:<path>\n' +
+				'<code content>\n' +
+				'```\n' +
+				'For example:\n' +
+				'```file:google.py\n' +
+				'import requests\n' +
+				'response = requests.get("https://www.google.com")\n' +
+				'print(response.status_code)\n' +
+				'```\n' +
+				'CodeAlloy will automatically parse this block, write the file to the workspace filesystem, and open it in the editor.\n' +
+				'Always provide complete, working code without truncation. Keep conversational explanations brief.';
+		}
+
 		const apiMessages = [
 			{
 				role: 'system',
-				content:
-					'You are CodeAlloy Agent, an autonomous open-model coding partner embedded directly in the CodeAlloy IDE. You write concise, high-performance, production-ready code. Always specify language tags in markdown code fences. Keep explanations clear, precise, and directly actionable.'
+				content: systemPrompt
 			},
 			...history,
 			{
@@ -307,7 +467,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 					}
 				});
 
-				res.on('end', () => {
+				res.on('end', async () => {
 					this._activeRequest = undefined;
 					const trimmedContent = assistantMsg.content.trim();
 					if (!trimmedContent) {
@@ -322,6 +482,14 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 							fullContent: assistantMsg.content
 						});
 					}
+
+					// Detect and execute filesystem operations
+					try {
+						await this._detectAndExecuteFiles(prompt, assistantMsg.content, assistantMsgId);
+					} catch (e: any) {
+						this._outputChannel.appendLine(`[AgentChat Error detecting/executing files]: ${e?.message}`);
+					}
+
 					resolve();
 				});
 			});
@@ -846,6 +1014,45 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		@keyframes blink {
 			0%, 100% { opacity: 1; }
 			50% { opacity: 0; }
+		}
+
+		.file-action-badge {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-top: 10px;
+			padding: 7px 12px;
+			background: rgba(78, 189, 121, 0.12);
+			border: 1px solid rgba(78, 189, 121, 0.4);
+			border-radius: 6px;
+			font-size: 11.5px;
+			color: #4EBD79 !important;
+			cursor: pointer;
+			transition: all 0.15s ease;
+		}
+
+		.file-action-badge:hover {
+			background: rgba(78, 189, 121, 0.22);
+			border-color: var(--ca-success);
+		}
+
+		.file-action-badge strong {
+			color: #4EBD79 !important;
+		}
+
+		.file-action-badge code {
+			background: var(--ca-code-bg);
+			padding: 2px 6px;
+			border-radius: 4px;
+			color: #ECEFF4 !important;
+			font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+			font-weight: 600;
+			border: 1px solid var(--ca-border);
+		}
+
+		.file-size {
+			color: var(--ca-text-muted) !important;
+			font-size: 10px;
 		}
 	</style>
 </head>
