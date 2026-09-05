@@ -12,24 +12,19 @@ function initOsDetection() {
   const ua = window.navigator.userAgent.toLowerCase();
   const platform = (window.navigator.userAgentData?.platform || window.navigator.platform || '').toLowerCase();
 
-  let os = 'mac-arm64'; // Default to Apple Silicon
   let osLabel = 'Download for macOS (Apple Silicon)';
-  let downloadAsset = 'CodeAlloy-v0.1.0-alpha.1-darwin-arm64.dmg';
+  let targetPattern = 'darwin-arm64.dmg';
 
   if (platform.includes('win') || ua.includes('windows')) {
-    os = 'win-x64';
     osLabel = 'Download for Windows (.zip / exe)';
-    downloadAsset = 'CodeAlloy-v0.1.0-alpha.1-win32-x64.zip';
+    targetPattern = 'win32-x64.zip';
   } else if (platform.includes('linux') || ua.includes('linux')) {
-    os = 'linux-x64';
     osLabel = 'Download for Linux (.deb / tar)';
-    downloadAsset = 'codealloy_0.1.0_amd64.deb';
+    targetPattern = 'amd64.deb';
   } else if (platform.includes('mac') || ua.includes('macintosh')) {
-    // Check for Intel Mac
     if (ua.includes('intel') && !navigator.maxTouchPoints) {
-      os = 'mac-x64';
       osLabel = 'Download for macOS (Intel)';
-      downloadAsset = 'CodeAlloy-v0.1.0-alpha.1-darwin-x64.dmg';
+      targetPattern = 'darwin-x64.dmg';
     }
   }
 
@@ -39,8 +34,8 @@ function initOsDetection() {
 
   if (primaryBtn) {
     primaryBtn.textContent = `⚡ ${osLabel}`;
-    primaryBtn.setAttribute('data-target-asset', downloadAsset);
-    primaryBtn.href = `https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/${downloadAsset}`;
+    primaryBtn.setAttribute('data-asset-match', targetPattern);
+    primaryBtn.href = `https://github.com/Heckle-and-Code/codealloy/releases/latest`;
   }
 
   // Dropdown Toggle
@@ -56,33 +51,35 @@ function initOsDetection() {
   }
 }
 
-// 2. Dynamic GitHub Releases Fetcher
+// 2. Dynamic GitHub Releases Fetcher (Automatically syncs to newest release)
 async function initReleaseApi() {
   const releaseStatusEl = document.getElementById('releaseStatusPill');
-  const fallbackTag = 'v0.1.0-alpha.1';
-  const fallbackUrl = `https://github.com/Heckle-and-Code/codealloy/releases/tag/${fallbackTag}`;
 
   try {
-    const res = await fetch('https://api.github.com/repos/Heckle-and-Code/codealloy/releases/latest');
+    // Query GitHub releases (handles both standard releases and alpha prereleases)
+    const res = await fetch('https://api.github.com/repos/Heckle-and-Code/codealloy/releases');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const releases = await res.json();
+    if (!Array.isArray(releases) || releases.length === 0) return;
 
-    const tag = data.tag_name || fallbackTag;
+    const latestRelease = releases[0];
+    const tag = latestRelease.tag_name;
+    const assets = latestRelease.assets || [];
+
     if (releaseStatusEl) {
       releaseStatusEl.innerHTML = `<span class="badge-dot"></span> Latest Release: <strong>${tag}</strong>`;
     }
 
-    // Map release assets to download cards if available
-    if (data.assets && data.assets.length > 0) {
-      data.assets.forEach(asset => {
+    // Automatically map latest release assets to ALL matching download buttons (hero, dropdown, cards)
+    if (assets.length > 0) {
+      assets.forEach(asset => {
         const name = asset.name;
         const sizeMb = (asset.size / (1024 * 1024)).toFixed(1);
         const url = asset.browser_download_url;
 
-        // Match links matching asset name pattern
         document.querySelectorAll(`[data-asset-match]`).forEach(link => {
           const matchPattern = link.getAttribute('data-asset-match');
-          if (name.includes(matchPattern)) {
+          if (matchPattern && name.includes(matchPattern)) {
             link.href = url;
             const sizeLabel = link.querySelector('.asset-size');
             if (sizeLabel) sizeLabel.textContent = `(${sizeMb} MB)`;
@@ -91,10 +88,7 @@ async function initReleaseApi() {
       });
     }
   } catch (err) {
-    // Graceful fallback to initial release tag
-    if (releaseStatusEl) {
-      releaseStatusEl.innerHTML = `<span class="badge-dot"></span> Version: <strong>${fallbackTag}</strong> (Alpha)`;
-    }
+    console.warn('Could not fetch latest release dynamically, using default links:', err);
   }
 }
 
