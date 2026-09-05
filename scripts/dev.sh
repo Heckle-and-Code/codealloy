@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-UPSTREAM_DIR="${ROOT_DIR}/.build/code-oss"
+UPSTREAM_DIR="$(cd "${ROOT_DIR}/.build/code-oss" 2>/dev/null && pwd -P || echo "${ROOT_DIR}/.build/code-oss")"
 
 # Ensure Node 20 LTS is active
 if [ -d "${HOME}/.nvm/versions/node/v20.16.0/bin" ]; then
@@ -47,7 +47,21 @@ else
     done
 fi
 
-echo "⚡ Launching CodeAlloy in ${TARGET_ARGS[0]}..."
-cd "${UPSTREAM_DIR}"
-./scripts/code.sh "${TARGET_ARGS[@]}"
+IS_CLI_COMMAND=false
+for arg in "$@"; do
+    if [[ "$arg" == --install-extension* || "$arg" == "--list-extensions" || "$arg" == "--uninstall-extension"* || "$arg" == "--version" ]]; then
+        IS_CLI_COMMAND=true
+        break
+    fi
+done
+
+if [ "$IS_CLI_COMMAND" = true ]; then
+    echo "⚡ Executing CodeAlloy CLI command..."
+    cd "${UPSTREAM_DIR}"
+    "${UPSTREAM_DIR}/scripts/code-cli.sh" "${TARGET_ARGS[@]}"
+else
+    echo "⚡ Launching CodeAlloy in ${TARGET_ARGS[0]}..."
+    cd "${UPSTREAM_DIR}"
+    "${UPSTREAM_DIR}/scripts/code.sh" "${TARGET_ARGS[@]}"
+fi
 

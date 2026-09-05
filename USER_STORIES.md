@@ -152,15 +152,15 @@ CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle 
 
 ---
 
-## Epic 4: Extension Ecosystem & Open VSX Marketplace
+## Epic 4: Extension Ecosystem & Open VSX Marketplace `[COMPLETED]`
 
-### US-4.1: Browsing and Installing Extensions via Open VSX
+### US-4.1: Browsing and Installing Extensions via Open VSX `[COMPLETED]`
 * **User Story**: As a developer switching from VS Code, I want to browse and install extensions (e.g. Python, Prettier, ESLint, Gruvbox) from Open VSX seamlessly, so that I have all my language tools and themes.
 * **Acceptance Criteria**:
   * **AC 4.1.1**: The Extensions tab in CodeAlloy connects to `https://open-vsx.org/vscode/gallery`.
   * **AC 4.1.2**: Search, installation, enable/disable, and updates function identically to standard VS Code.
 
-### US-4.2: Sideloading `.vsix` Packages
+### US-4.2: Sideloading `.vsix` Packages `[COMPLETED]`
 * **User Story**: As a developer with proprietary or offline extensions, I want to drag-and-drop a `.vsix` file into CodeAlloy, so that I can install non-marketplace extensions.
 * **Acceptance Criteria**:
   * **AC 4.2.1**: Dragging a `.vsix` into the window or running `CodeAlloy --install-extension <path.vsix>` installs the extension cleanly.
