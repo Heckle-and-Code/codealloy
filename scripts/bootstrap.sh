@@ -160,6 +160,9 @@ node -e "
 # 5. Installing dependencies across all subprojects
 echo ""
 echo "📥 Installing dependencies (root, build, extensions)..."
+if [[ "${OS_NAME}" == *"mingw"* ]] || [[ "${OS_NAME}" == *"msys"* ]] || [[ "${OS_NAME}" == *"cygwin"* ]]; then
+    npm config set msvs_version 2022 2>/dev/null || true
+fi
 cd "${BUILD_CACHE_DIR}"
 npm install
 
