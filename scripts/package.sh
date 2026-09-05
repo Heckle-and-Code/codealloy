@@ -46,6 +46,14 @@ node -e "
   }
 " 2>/dev/null || true
 
+echo "  ⚡ Compiling CodeAlloy core extension (codealloy-models)..."
+(cd "${ROOT_DIR}" && "${UPSTREAM_DIR}/node_modules/typescript/bin/tsc" -p extensions/codealloy-models/tsconfig.json)
+
+echo "  ⚡ Staging codealloy-models into Code-OSS extensions..."
+rm -rf "${UPSTREAM_DIR}/extensions/codealloy-models"
+mkdir -p "${UPSTREAM_DIR}/extensions/codealloy-models"
+cp -R "${ROOT_DIR}/extensions/codealloy-models/"* "${UPSTREAM_DIR}/extensions/codealloy-models/"
+
 echo "  ⚡ Transpiling client and extensions..."
 npm run gulp transpile-client-esbuild transpile-extensions
 
@@ -75,6 +83,14 @@ case "${UNAME_OUT}" in
         APP_BUNDLE=$(find "${SEARCH_APP}" -maxdepth 2 -name "*.app" | head -n 1)
 
         if [ -n "${APP_BUNDLE}" ] && [ -d "${APP_BUNDLE}" ]; then
+            echo "  📦 Embedding codealloy-models into ${APP_BUNDLE}..."
+            mkdir -p "${APP_BUNDLE}/Contents/Resources/app/extensions/codealloy-models"
+            cp -R "${ROOT_DIR}/extensions/codealloy-models/package.json" "${APP_BUNDLE}/Contents/Resources/app/extensions/codealloy-models/"
+            cp -R "${ROOT_DIR}/extensions/codealloy-models/out" "${APP_BUNDLE}/Contents/Resources/app/extensions/codealloy-models/"
+            if [ -d "${ROOT_DIR}/extensions/codealloy-models/resources" ]; then
+                cp -R "${ROOT_DIR}/extensions/codealloy-models/resources" "${APP_BUNDLE}/Contents/Resources/app/extensions/codealloy-models/"
+            fi
+
             if command -v codesign >/dev/null 2>&1; then
                 echo "  🔏 Ad-hoc codesigning ${APP_BUNDLE}..."
                 codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || true
@@ -103,6 +119,14 @@ case "${UNAME_OUT}" in
         PARENT_DIR="$(cd "${UPSTREAM_DIR}/.." && pwd)"
         LINUX_OUT="${PARENT_DIR}/VSCode-linux-x64"
         if [ -d "${LINUX_OUT}" ]; then
+            echo "  📦 Embedding codealloy-models into ${LINUX_OUT}..."
+            mkdir -p "${LINUX_OUT}/resources/app/extensions/codealloy-models"
+            cp -R "${ROOT_DIR}/extensions/codealloy-models/package.json" "${LINUX_OUT}/resources/app/extensions/codealloy-models/"
+            cp -R "${ROOT_DIR}/extensions/codealloy-models/out" "${LINUX_OUT}/resources/app/extensions/codealloy-models/"
+            if [ -d "${ROOT_DIR}/extensions/codealloy-models/resources" ]; then
+                cp -R "${ROOT_DIR}/extensions/codealloy-models/resources" "${LINUX_OUT}/resources/app/extensions/codealloy-models/"
+            fi
+
             echo "  📦 Creating CodeAlloy-v${VERSION}-linux-x64.tar.gz..."
             tar -czf "${DIST_DIR}/CodeAlloy-v${VERSION}-linux-x64.tar.gz" -C "${PARENT_DIR}" "VSCode-linux-x64"
         fi
@@ -114,6 +138,14 @@ case "${UNAME_OUT}" in
         PARENT_DIR="$(cd "${UPSTREAM_DIR}/.." && pwd)"
         WIN_OUT="${PARENT_DIR}/VSCode-win32-x64"
         if [ -d "${WIN_OUT}" ]; then
+            echo "  📦 Embedding codealloy-models into ${WIN_OUT}..."
+            mkdir -p "${WIN_OUT}/resources/app/extensions/codealloy-models"
+            cp -R "${ROOT_DIR}/extensions/codealloy-models/package.json" "${WIN_OUT}/resources/app/extensions/codealloy-models/"
+            cp -R "${ROOT_DIR}/extensions/codealloy-models/out" "${WIN_OUT}/resources/app/extensions/codealloy-models/"
+            if [ -d "${ROOT_DIR}/extensions/codealloy-models/resources" ]; then
+                cp -R "${ROOT_DIR}/extensions/codealloy-models/resources" "${WIN_OUT}/resources/app/extensions/codealloy-models/"
+            fi
+
             echo "  📦 Creating CodeAlloy-v${VERSION}-win32-x64.zip..."
             if command -v 7z >/dev/null 2>&1; then
                 7z a -tzip -mx=5 "${DIST_DIR}/CodeAlloy-v${VERSION}-win32-x64.zip" "${WIN_OUT}"/*

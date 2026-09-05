@@ -189,7 +189,15 @@ cd "${BUILD_CACHE_DIR}"
 export npm_command="install"
 node build/npm/postinstall.js
 
-# 6. Compiling the CodeAlloy Shell
+# 6. Linking and Compiling CodeAlloy Core Extension
+echo ""
+echo "🧩 Linking & compiling CodeAlloy core extensions (codealloy-models)..."
+mkdir -p "${BUILD_CACHE_DIR}/extensions"
+rm -rf "${BUILD_CACHE_DIR}/extensions/codealloy-models"
+ln -sfn "${ROOT_DIR}/extensions/codealloy-models" "${BUILD_CACHE_DIR}/extensions/codealloy-models"
+(cd "${ROOT_DIR}" && "${BUILD_CACHE_DIR}/node_modules/typescript/bin/tsc" -p extensions/codealloy-models/tsconfig.json 2>/dev/null || true)
+
+# 7. Compiling the CodeAlloy Shell
 echo ""
 echo "🔨 Compiling CodeAlloy shell..."
 cd "${BUILD_CACHE_DIR}"
