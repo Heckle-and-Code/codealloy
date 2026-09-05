@@ -22,6 +22,8 @@ CodeAlloy is an open-source, open-model-native autonomous IDE forked from **Code
 | :--- | :--- |
 | **[PROPOSAL.md](./PROPOSAL.md)** | Full technical proposal, architectural diagrams, model matrix, and storage tradeoffs. |
 | **[USER_STORIES.md](./USER_STORIES.md)** | Granular user stories and acceptance criteria organized by feature epic. |
+| **[CHANGELOG.md](./CHANGELOG.md)** | Project changelog organized by version and Keep a Changelog standard. |
+| **[RELEASING.md](./docs/RELEASING.md)** | Guide to creating GitHub releases and downloading desktop installer packages. |
 
 ---
 

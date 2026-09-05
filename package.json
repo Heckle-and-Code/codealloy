@@ -12,7 +12,8 @@
   "scripts": {
     "bootstrap": "bash ./scripts/bootstrap.sh",
     "dev": "bash ./scripts/dev.sh",
-    "package": "bash ./scripts/package.sh"
+    "package": "bash ./scripts/package.sh",
+    "release": "bash ./scripts/release.sh"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

@@ -1,0 +1,165 @@
+name: Release CodeAlloy
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g. v0.1.0-alpha.1)'
+        required: false
+        default: ''
+      is_prerelease:
+        description: 'Mark as pre-release'
+        type: boolean
+        default: true
+      is_draft:
+        description: 'Create as draft'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build (${{ matrix.target.os }}-${{ matrix.target.arch }})
+    runs-on: ${{ matrix.target.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - os: darwin
+            arch: arm64
+            runner: macos-14
+            pkg_name: CodeAlloy-darwin-arm64
+          - os: darwin
+            arch: x64
+            runner: macos-13
+            pkg_name: CodeAlloy-darwin-x64
+          - os: linux
+            arch: x64
+            runner: ubuntu-latest
+            pkg_name: CodeAlloy-linux-x64
+          - os: win32
+            arch: x64
+            runner: windows-latest
+            pkg_name: CodeAlloy-win32-x64
+
+    steps:
+      - name: Checkout CodeAlloy Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 20 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Python for node-gyp
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install System Dependencies (Linux)
+        if: matrix.target.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libkrb5-dev libsecret-1-dev libx11-dev libxkbfile-dev
+
+      - name: Bootstrap CodeAlloy Base
+        shell: bash
+        run: |
+          bash ./scripts/bootstrap.sh
+
+      - name: Package CodeAlloy (${{ matrix.target.os }}-${{ matrix.target.arch }})
+        shell: bash
+        run: |
+          bash ./scripts/package.sh
+
+      - name: Prepare Artifacts & Checksums
+        shell: bash
+        run: |
+          mkdir -p dist
+          # Move distribution packages from .build or out to dist
+          find . -maxdepth 3 -name "CodeAlloy-*" -o -name "codealloy_*" | while read -r f; do
+            if [ -f "$f" ]; then
+              cp "$f" dist/
+            elif [ -d "$f" ] && [[ "$f" == *.app ]]; then
+              zip -r "dist/${{ matrix.target.pkg_name }}.zip" "$f"
+            fi
+          done
+          
+          cd dist
+          for asset in *; do
+            if [ -f "$asset" ] && [[ "$asset" != *.sha256 ]]; then
+              shasum -a 256 "$asset" > "${asset}.sha256" || sha256sum "$asset" > "${asset}.sha256"
+            fi
+          done
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: codealloy-${{ matrix.target.os }}-${{ matrix.target.arch }}
+          path: dist/*
+          if-no-files-found: warn
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download All Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate Checksums Manifest
+        run: |
+          cd release-assets
+          echo "### SHA-256 Checksums" > checksums.txt
+          echo '```' >> checksums.txt
+          sha256sum * >> checksums.txt 2>/dev/null || true
+          echo '```' >> checksums.txt
+          cat checksums.txt
+
+      - name: Extract Release Notes from CHANGELOG.md
+        id: changelog
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then
+            TAG="${{ inputs.tag_name || 'v0.1.0-alpha.1' }}"
+          fi
+          CLEAN_VER="${TAG#v}"
+          
+          # Extract the section for this version from CHANGELOG.md
+          awk -v ver="$CLEAN_VER" '
+            $0 ~ "^## \\[" ver "\\]" { found=1; next }
+            found && $0 ~ "^## \\[" { exit }
+            found { print }
+          ' CHANGELOG.md > release_notes.md
+          
+          if [ ! -s release_notes.md ]; then
+            echo "Release notes for version ${CLEAN_VER} not found in CHANGELOG.md, using commit summary." > release_notes.md
+          fi
+          
+          cat release-assets/checksums.txt >> release_notes.md
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || inputs.tag_name }}
+          name: CodeAlloy ${{ github.ref_name || inputs.tag_name }}
+          body_path: release_notes.md
+          files: release-assets/*
+          prerelease: ${{ inputs.is_prerelease != false }}
+          draft: ${{ inputs.is_draft == true }}
+          generate_release_notes: true
