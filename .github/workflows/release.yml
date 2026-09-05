@@ -36,7 +36,7 @@ jobs:
             pkg_name: CodeAlloy-darwin-arm64
           - os: darwin
             arch: x64
-            runner: macos-13
+            runner: macos-14
             pkg_name: CodeAlloy-darwin-x64
           - os: linux
             arch: x64
@@ -123,6 +123,7 @@ jobs:
   publish-release:
     name: Publish GitHub Release
     needs: build-release
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
