@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.0-alpha.3] - 2026-09-05
+
+### Fixed
+- **Built-in AI Extension Packaging**: Explicitly compiled and embedded `extensions/codealloy-models` into the final application bundle across macOS, Linux, and Windows releases. Previously, the release packager built clean Code-OSS without embedding the CodeAlloy agent panel, model selector, and autonomy dial.
+- **Developer Bootstrap Extension Link**: Updated `scripts/bootstrap.sh` to automatically link and compile `codealloy-models` during setup.
+
+---
+
 ## [0.1.0-alpha.2] - 2026-09-05
 
 ### Fixed
