@@ -91,6 +91,11 @@ case "${UNAME_OUT}" in
                 cp -R "${ROOT_DIR}/extensions/codealloy-models/resources" "${APP_BUNDLE}/Contents/Resources/app/extensions/codealloy-models/"
             fi
 
+            # Create CLI launcher symlinks in app bin
+            mkdir -p "${APP_BUNDLE}/Contents/Resources/app/bin"
+            ln -sf code "${APP_BUNDLE}/Contents/Resources/app/bin/alloy"
+            ln -sf code "${APP_BUNDLE}/Contents/Resources/app/bin/codealloy"
+
             if command -v codesign >/dev/null 2>&1; then
                 echo "  🔏 Ad-hoc codesigning ${APP_BUNDLE}..."
                 codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || true
@@ -127,6 +132,11 @@ case "${UNAME_OUT}" in
                 cp -R "${ROOT_DIR}/extensions/codealloy-models/resources" "${LINUX_OUT}/resources/app/extensions/codealloy-models/"
             fi
 
+            # Create CLI launcher symlinks
+            mkdir -p "${LINUX_OUT}/bin"
+            ln -sf code "${LINUX_OUT}/bin/alloy" 2>/dev/null || true
+            ln -sf code "${LINUX_OUT}/bin/codealloy" 2>/dev/null || true
+
             echo "  📦 Creating CodeAlloy-v${VERSION}-linux-x64.tar.gz..."
             tar -czf "${DIST_DIR}/CodeAlloy-v${VERSION}-linux-x64.tar.gz" -C "${PARENT_DIR}" "VSCode-linux-x64"
         fi
@@ -144,6 +154,12 @@ case "${UNAME_OUT}" in
             cp -R "${ROOT_DIR}/extensions/codealloy-models/out" "${WIN_OUT}/resources/app/extensions/codealloy-models/"
             if [ -d "${ROOT_DIR}/extensions/codealloy-models/resources" ]; then
                 cp -R "${ROOT_DIR}/extensions/codealloy-models/resources" "${WIN_OUT}/resources/app/extensions/codealloy-models/"
+            fi
+
+            # Create Windows CLI cmd wrappers
+            if [ -f "${WIN_OUT}/bin/code.cmd" ]; then
+                cp "${WIN_OUT}/bin/code.cmd" "${WIN_OUT}/bin/alloy.cmd"
+                cp "${WIN_OUT}/bin/code.cmd" "${WIN_OUT}/bin/codealloy.cmd"
             fi
 
             echo "  📦 Creating CodeAlloy-v${VERSION}-win32-x64.zip..."
