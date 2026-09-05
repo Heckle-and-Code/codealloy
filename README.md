@@ -2,6 +2,12 @@
 
 > **"Where developer intent meets open models."**
 
+[![Release](https://img.shields.io/github/v/release/Heckle-and-Code/codealloy?color=orange&label=Release)](https://github.com/Heckle-and-Code/codealloy/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)](https://github.com/Heckle-and-Code/codealloy/releases)
+[![Website](https://img.shields.io/badge/Website-Live-emerald?color=10B981)](https://heckle-and-code.github.io/codealloy/)
+[![Open VSX](https://img.shields.io/badge/Extensions-Open%20VSX-purple)](https://open-vsx.org)
+
 CodeAlloy is an open-source, open-model-native autonomous IDE forked from **Code-OSS / VSCodium**. It brings Antigravity/Cursor-grade agentic coding to sovereign and local open-weights models (like **Qwen 2.5 Coder**, **DeepSeek**, **Gemma**, and **Llama**) with fine-grained autonomy controls and atomic time-travel rollbacks.
 
 ---
