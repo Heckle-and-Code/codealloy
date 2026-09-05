@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>CodeAlloy — Where Developer Intent Meets Open Models</title>
+  <meta name="description" content="CodeAlloy is an open-source, open-model-native autonomous IDE. Sovereign agentic coding with Qwen 2.5 Coder, DeepSeek, Gemma, and Llama, featuring 5-tier autonomy controls and sub-5ms atomic time-travel rollbacks.">
+  <meta name="keywords" content="CodeAlloy, AI IDE, autonomous IDE, open weights models, Qwen 2.5 Coder, DeepSeek Coder, Ollama, vLLM, Open VSX, Shadow Git, developer tools">
+  <meta name="author" content="Heckle and Code">
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://heckle-and-code.github.io/codealloy/">
+  <meta property="og:title" content="CodeAlloy — Where Developer Intent Meets Open Models">
+  <meta property="og:description" content="An open-model-native autonomous IDE forked from Code-OSS with 5-tier autonomy dials and sub-5ms atomic Git rollbacks.">
+  <meta property="og:image" content="assets/forge_banner.png">
+
+  <!-- Twitter Meta -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="CodeAlloy ⚡ Autonomous Open-Model IDE">
+  <meta name="twitter:description" content="Where developer intent meets open models. Built for Ollama, vLLM, and sovereign AI coding.">
+  <meta name="twitter:image" content="assets/forge_banner.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Site Navigation -->
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a href="#" class="brand-link">
+        <img src="assets/icon.png" alt="CodeAlloy Icon" class="brand-icon">
+        <span class="brand-name">CodeAlloy</span>
+      </a>
+
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#autonomy">Autonomy Dial</a></li>
+        <li><a href="#diffs">Inline Diffs</a></li>
+        <li><a href="#downloads">Downloads</a></li>
+        <li><a href="https://github.com/Heckle-and-Code/codealloy" target="_blank" rel="noopener">GitHub</a></li>
+      </ul>
+
+      <div class="nav-cta">
+        <a href="#downloads" class="btn btn-primary">Download Free</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero-section">
+    <div class="container">
+      <div id="releaseStatusPill" class="badge-tag">
+        <span class="badge-dot"></span> Developer Preview v0.1.0-alpha.1
+      </div>
+
+      <h1 class="hero-title">
+        Where Developer Intent Meets <br><span class="glow-text">Open Models.</span>
+      </h1>
+
+      <p class="hero-subtitle">
+        The sovereign, open-model-native autonomous IDE. Pair program with <strong>Qwen 2.5 Coder</strong>, <strong>DeepSeek</strong>, and <strong>Llama</strong> via local Ollama or vLLM—with 5-tier autonomy controls and sub-5ms atomic Git rollbacks.
+      </p>
+
+      <!-- Smart Download CTA -->
+      <div class="cta-group">
+        <div class="download-split">
+          <a id="primaryDownloadBtn" href="#downloads" class="btn btn-primary btn-lg btn-download-primary">
+            ⚡ Download for macOS
+          </a>
+          <button id="downloadDropdownToggle" class="btn btn-primary btn-lg btn-download-dropdown" aria-label="Select Operating System">
+            ▼
+          </button>
+          
+          <div id="downloadDropdownMenu" class="dropdown-menu">
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/CodeAlloy-v0.1.0-alpha.1-darwin-arm64.dmg" class="dropdown-item">
+              <span>🍎 macOS (Apple Silicon M1/M2/M3/M4)</span>
+              <small>.dmg</small>
+            </a>
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/CodeAlloy-v0.1.0-alpha.1-darwin-x64.dmg" class="dropdown-item">
+              <span>🍏 macOS (Intel Core)</span>
+              <small>.dmg</small>
+            </a>
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/CodeAlloy-v0.1.0-alpha.1-win32-x64.zip" class="dropdown-item">
+              <span>🪟 Windows 64-bit</span>
+              <small>.zip</small>
+            </a>
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/codealloy_0.1.0_amd64.deb" class="dropdown-item">
+              <span>🐧 Linux (Ubuntu / Debian)</span>
+              <small>.deb</small>
+            </a>
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/CodeAlloy-v0.1.0-alpha.1-linux-x64.tar.gz" class="dropdown-item">
+              <span>📦 Linux Standalone</span>
+              <small>.tar.gz</small>
+            </a>
+          </div>
+        </div>
+
+        <a href="https://github.com/Heckle-and-Code/codealloy" target="_blank" rel="noopener" class="btn btn-secondary btn-lg">
+          ⭐ Star on GitHub
+        </a>
+      </div>
+
+      <div class="release-meta">
+        Free and Open Source under MIT License • <a href="https://github.com/Heckle-and-Code/codealloy/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Read the Changelog</a>
+      </div>
+
+      <!-- Hero Visual Showcase -->
+      <div class="hero-visual">
+        <img src="assets/forge_banner.png" alt="CodeAlloy Cinematic Forge Banner" class="hero-banner-img">
+      </div>
+    </div>
+  </section>
+
+  <!-- Core Features Grid -->
+  <section id="features" class="section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-kicker">Built for Sovereignty & Speed</div>
+        <h2 class="section-title">The Anvil and the Hammer</h2>
+        <p class="section-desc">Everything you love about VS Code, supercharged with autonomous open-weights agentic workflows.</p>
+      </div>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon-wrap">🤖</div>
+          <h3 class="feature-title">Dynamic Open-Model Engine</h3>
+          <p class="feature-desc">Connect directly to local Ollama (`localhost:11434`), self-hosted vLLM, or llama.cpp. Switch models dynamically without hardcoded API version deprecations.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">🎛️</div>
+          <h3 class="feature-title">5-Tier Autonomy Dial</h3>
+          <p class="feature-desc">Choose your comfort level on the fly. From passive autocomplete (L0) to supervised paired coding (L2) and guarded workspace automation (L3).</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">⏪</div>
+          <h3 class="feature-title">Sub-5ms Shadow Git</h3>
+          <p class="feature-desc">Isolated pre-turn snapshot engine. Every modification creates an atomic checkpoint in `~/.codealloy/history.git`. Click [Undo Turn] for instant 1-click rollbacks.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">🧩</div>
+          <h3 class="feature-title">Open VSX Marketplace</h3>
+          <p class="feature-desc">Direct access to the open Eclipse Open VSX registry. Install Python, Prettier, ESLint, Gruvbox, or sideload any proprietary `.vsix` package cleanly.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">✨</div>
+          <h3 class="feature-title">Native Inline Streaming Diffs</h3>
+          <p class="feature-desc">Review agent proposals directly inside the active buffer with green addition and red deletion decorations. Accept with Tab, reject with Esc.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-icon-wrap">🔌</div>
+          <h3 class="feature-title">Model Context Protocol (MCP)</h3>
+          <p class="feature-desc">Plug in databases, APIs, and custom CLI tools via JSON-RPC 2.0 stdio MCP servers. Your local model can query external tools securely.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Autonomy Dial Simulator -->
+  <section id="autonomy" class="section" style="background: rgba(20, 22, 28, 0.4);">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-kicker">Fine-Grained Execution Control</div>
+        <h2 class="section-title">The Autonomy Dial</h2>
+        <p class="section-desc">You are the blacksmith at the anvil. Choose exactly how much freedom you give the model for every task.</p>
+      </div>
+
+      <div class="autonomy-widget">
+        <!-- Selector Buttons -->
+        <div class="autonomy-selector-wrap">
+          <div class="autonomy-nav">
+            <button class="autonomy-btn" data-level="l0">
+              <div>
+                <strong>L0: Assist</strong>
+                <div style="font-size: 0.8rem; color: var(--text-dim);">Inline Ghost Text & Autocomplete</div>
+              </div>
+              <span class="autonomy-level-tag">L0</span>
+            </button>
+
+            <button class="autonomy-btn" data-level="l1">
+              <div>
+                <strong>L1: Chat</strong>
+                <div style="font-size: 0.8rem; color: var(--text-dim);">Read-Only Conversational Advice</div>
+              </div>
+              <span class="autonomy-level-tag">L1</span>
+            </button>
+
+            <button class="autonomy-btn active" data-level="l2">
+              <div>
+                <strong>L2: Supervised (Default)</strong>
+                <div style="font-size: 0.8rem; color: var(--text-dim);">1-Click Side-by-Side Diff Approvals</div>
+              </div>
+              <span class="autonomy-level-tag">L2</span>
+            </button>
+
+            <button class="autonomy-btn" data-level="l3">
+              <div>
+                <strong>L3: Guarded</strong>
+                <div style="font-size: 0.8rem; color: var(--text-dim);">Safe Workspace Auto-Execution</div>
+              </div>
+              <span class="autonomy-level-tag">L3</span>
+            </button>
+
+            <button class="autonomy-btn" data-level="l4">
+              <div>
+                <strong>L4: Autonomous</strong>
+                <div style="font-size: 0.8rem; color: var(--text-dim);">Goal Runner with Circuit Breakers</div>
+              </div>
+              <span class="autonomy-level-tag">L4</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Live Simulated Output Card -->
+        <div class="sim-preview-box">
+          <div class="sim-window-header">
+            <div class="window-dots">
+              <span class="window-dot"></span>
+              <span class="window-dot"></span>
+              <span class="window-dot"></span>
+            </div>
+            <span>CodeAlloy Agent Simulator</span>
+            <span>⚡ Ready</span>
+          </div>
+
+          <div class="sim-body">
+            <span id="simBadge" class="sim-badge supervised">L2: Supervised</span>
+            <h3 id="simHeading" class="sim-heading">Level 2 — Supervised 1-Click Diff Approvals</h3>
+            <p id="simText" class="sim-text">The default paired programming mode. The model autonomously formulates edits and shell commands, but pauses execution to present an interactive diff card for your explicit approval.</p>
+            
+            <div id="simActionCard" class="sim-action-card">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <strong style="color: #FFAE19;">Action Required: write_file</strong>
+                <span style="color: #656B7D;">src/auth.ts</span>
+              </div>
+              <div style="background: #14151A; padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                <span style="color: #4EBD79;">+ export const hashPassword = async (pwd) =&gt; { ... }</span>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <span style="background: #FF8C00; color: #121316; padding: 4px 10px; border-radius: 4px; font-weight: 700; font-size: 0.75rem;">Approve [Enter]</span>
+                <span style="background: #2A2E3B; color: #E2E4EB; padding: 4px 10px; border-radius: 4px; font-size: 0.75rem;">Reject [Esc]</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Interactive Inline Diff Showcase -->
+  <section id="diffs" class="section">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-kicker">Native Workbench Integration</div>
+        <h2 class="section-title">Zero Raw Code Dumps. Pure Inline Diffs.</h2>
+        <p class="section-desc">Never copy and paste from a chatbot window again. CodeAlloy renders proposed edits directly inside your active editor buffer.</p>
+      </div>
+
+      <div style="max-width: 800px; margin: 0 auto;">
+        <div class="diff-viewer" id="diffViewer">
+          <div class="diff-line context"><span style="width: 24px;">1</span> import { SovereignEngine } from '@codealloy/core';</div>
+          <div class="diff-line del"><span style="width: 24px;">2</span> const engine = new SovereignEngine();</div>
+          <div class="diff-line add"><span style="width: 24px;">2</span> const engine = new SovereignEngine({ provider: 'ollama' });</div>
+          <div class="diff-line context"><span style="width: 24px;">3</span> await engine.start();</div>
+        </div>
+
+        <div class="diff-actions" style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px;">
+          <div style="display: flex; gap: 10px;">
+            <button id="diffAcceptBtn" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">
+              ✓ Accept Chunk (Tab)
+            </button>
+            <button id="diffRejectBtn" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">
+              ✕ Reject Chunk (Esc)
+            </button>
+          </div>
+          <div id="diffStatusMsg" style="font-size: 0.85rem; color: var(--text-dim);">
+            Click Accept or Reject to test inline diff buffer resolution
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Complete Downloads Section -->
+  <section id="downloads" class="section" style="background: rgba(18, 19, 22, 0.6);">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-kicker">Cross-Platform Distribution</div>
+        <h2 class="section-title">Forge Your Sovereign IDE</h2>
+        <p class="section-desc">Download standalone desktop packages for macOS, Windows, and Linux.</p>
+      </div>
+
+      <div class="downloads-grid">
+        <!-- macOS -->
+        <div class="download-card">
+          <span class="download-os-icon">🍎</span>
+          <h3 class="download-os-title">macOS</h3>
+          <p class="download-os-desc">Universal build for Apple Silicon (M1/M2/M3/M4) & Intel Core processors.</p>
+          
+          <div class="download-btn-group">
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/CodeAlloy-v0.1.0-alpha.1-darwin-arm64.dmg" data-asset-match="darwin-arm64.dmg" class="btn btn-primary">
+              Apple Silicon (.dmg) <span class="asset-size"></span>
+            </a>
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/CodeAlloy-v0.1.0-alpha.1-darwin-x64.dmg" data-asset-match="darwin-x64.dmg" class="btn btn-secondary">
+              Intel Core (.dmg) <span class="asset-size"></span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Windows -->
+        <div class="download-card">
+          <span class="download-os-icon">🪟</span>
+          <h3 class="download-os-title">Windows</h3>
+          <p class="download-os-desc">Native 64-bit Windows setup package and standalone portable zip archive.</p>
+          
+          <div class="download-btn-group">
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/CodeAlloy-v0.1.0-alpha.1-win32-x64.zip" data-asset-match="win32-x64.zip" class="btn btn-primary">
+              Windows 64-bit (.zip) <span class="asset-size"></span>
+            </a>
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases" class="btn btn-secondary">
+              Installer (.exe)
+            </a>
+          </div>
+        </div>
+
+        <!-- Linux -->
+        <div class="download-card">
+          <span class="download-os-icon">🐧</span>
+          <h3 class="download-os-title">Linux</h3>
+          <p class="download-os-desc">Pre-packaged distributions for Ubuntu, Debian, Fedora, and Arch Linux.</p>
+          
+          <div class="download-btn-group">
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/codealloy_0.1.0_amd64.deb" data-asset-match="amd64.deb" class="btn btn-primary">
+              Debian / Ubuntu (.deb) <span class="asset-size"></span>
+            </a>
+            <a href="https://github.com/Heckle-and-Code/codealloy/releases/download/v0.1.0-alpha.1/CodeAlloy-v0.1.0-alpha.1-linux-x64.tar.gz" data-asset-match="linux-x64.tar.gz" class="btn btn-secondary">
+              Standalone (.tar.gz) <span class="asset-size"></span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 40px; color: var(--text-dim); font-size: 0.9rem;">
+        Need to verify package integrity? <a href="https://github.com/Heckle-and-Code/codealloy/releases/tag/v0.1.0-alpha.1" target="_blank" rel="noopener" style="color: var(--forge-gold); text-decoration: none;">Download SHA-256 Checksums</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Site Footer -->
+  <footer class="site-footer">
+    <div class="container footer-wrap">
+      <div>
+        <strong>CodeAlloy</strong> — Where developer intent meets open models.
+        <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">
+          Released under the MIT License • Built by Heckle and Code
+        </div>
+      </div>
+
+      <ul class="footer-links">
+        <li><a href="https://github.com/Heckle-and-Code/codealloy" target="_blank" rel="noopener">GitHub</a></li>
+        <li><a href="https://github.com/Heckle-and-Code/codealloy/releases" target="_blank" rel="noopener">Releases</a></li>
+        <li><a href="https://github.com/Heckle-and-Code/codealloy/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a></li>
+        <li><a href="https://github.com/Heckle-and-Code/codealloy/blob/main/docs/RELEASING.md" target="_blank" rel="noopener">Releasing Guide</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>
