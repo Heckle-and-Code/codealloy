@@ -680,6 +680,71 @@ body {
   gap: 10px;
 }
 
+/* Join the Forge / Contribute Section */
+.contribute-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 28px;
+}
+
+.contribute-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 36px;
+  display: flex;
+  flex-direction: column;
+  transition: all var(--transition-smooth);
+}
+
+.contribute-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-highlight);
+  box-shadow: var(--shadow-card);
+}
+
+.contribute-card.highlight {
+  border-color: rgba(255, 140, 0, 0.4);
+  background: linear-gradient(180deg, rgba(255, 140, 0, 0.05) 0%, var(--bg-surface) 100%);
+}
+
+.contribute-icon {
+  font-size: 2.2rem;
+  margin-bottom: 16px;
+}
+
+.contribute-role-title {
+  font-family: var(--font-heading);
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--text-pure);
+  margin-bottom: 12px;
+}
+
+.contribute-role-desc {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.contribute-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+  flex-grow: 1;
+}
+
+.contribute-list li {
+  font-size: 0.9rem;
+  color: var(--text-main);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
 /* Footer */
 .site-footer {
   border-top: 1px solid var(--border-subtle);
