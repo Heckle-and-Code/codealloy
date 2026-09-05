@@ -96,7 +96,13 @@ case "${UNAME_OUT}" in
         WIN_OUT="${PARENT_DIR}/VSCode-win32-x64"
         if [ -d "${WIN_OUT}" ]; then
             echo "  📦 Creating CodeAlloy-v${VERSION}-win32-x64.zip..."
-            (cd "${PARENT_DIR}" && zip -r -q "${DIST_DIR}/CodeAlloy-v${VERSION}-win32-x64.zip" "VSCode-win32-x64")
+            if command -v 7z >/dev/null 2>&1; then
+                7z a -tzip -mx=5 "${DIST_DIR}/CodeAlloy-v${VERSION}-win32-x64.zip" "${WIN_OUT}"/*
+            elif command -v powershell >/dev/null 2>&1; then
+                powershell -Command "Compress-Archive -Path '${WIN_OUT}/*' -DestinationPath '${DIST_DIR}/CodeAlloy-v${VERSION}-win32-x64.zip' -Force"
+            elif command -v zip >/dev/null 2>&1; then
+                (cd "${PARENT_DIR}" && zip -r -q "${DIST_DIR}/CodeAlloy-v${VERSION}-win32-x64.zip" "VSCode-win32-x64")
+            fi
         fi
         ;;
 
