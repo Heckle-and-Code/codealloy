@@ -32,6 +32,17 @@ export NODE_OPTIONS="--max-old-space-size=8192"
 echo "📦 Packaging CodeAlloy v${VERSION}..."
 cd "${UPSTREAM_DIR}"
 
+# Ensure product.json has builtInExtensions array required by gulp packaging
+node -e "
+  const fs = require('fs');
+  const p = '${UPSTREAM_DIR}/product.json';
+  if (fs.existsSync(p)) {
+    const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+    if (!Array.isArray(data.builtInExtensions)) data.builtInExtensions = [];
+    fs.writeFileSync(p, JSON.stringify(data, null, 2));
+  }
+" 2>/dev/null || true
+
 echo "  ⚡ Transpiling client and extensions..."
 npm run gulp transpile-client-esbuild transpile-extensions
 

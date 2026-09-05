@@ -20,6 +20,7 @@
   "telemetryConfiguration": {
     "default": false
   },
+  "builtInExtensions": [],
   "openToWelcomeMainPage": true,
   "linkProtectionTrustedDomains": [
     "https://open-vsx.org",
