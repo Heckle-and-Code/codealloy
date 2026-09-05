@@ -44,7 +44,7 @@ jobs:
             pkg_name: CodeAlloy-linux-x64
           - os: win32
             arch: x64
-            runner: windows-latest
+            runner: windows-2022
             pkg_name: CodeAlloy-win32-x64
 
     env:
@@ -68,6 +68,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Setup Visual Studio Developer Command Prompt (Windows)
+        if: matrix.target.os == 'win32'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Install System Dependencies (Linux)
         if: matrix.target.os == 'linux'
