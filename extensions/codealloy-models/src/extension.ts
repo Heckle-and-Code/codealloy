@@ -71,6 +71,26 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.undoLastTurn', async () => {
+			const shadowGit = chatProvider.getShadowGit();
+			const result = await shadowGit.undoLastTurn();
+			if (result.success && result.entry) {
+				vscode.window.showInformationMessage(
+					`CodeAlloy: Successfully rolled back last turn (${result.entry.commitHash.substring(0, 8)}).`
+				);
+			} else {
+				vscode.window.showInformationMessage('CodeAlloy: No agent turns available to undo.');
+			}
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.timeTravelTimeline', async () => {
+			await showTimeTravelQuickPick();
+		})
+	);
+
+	context.subscriptions.push(
 		vscode.commands.registerCommand('codealloy.selectModel', async () => {
 			await showModelPicker();
 		})
@@ -557,6 +577,44 @@ async function downloadModelWithProgress(model: CuratedModel): Promise<void> {
 			}
 		}
 	);
+}
+
+async function showTimeTravelQuickPick(): Promise<void> {
+	const shadowGit = chatProvider.getShadowGit();
+	const timeline = shadowGit.getHistoryTimeline();
+
+	if (!timeline || timeline.length === 0) {
+		vscode.window.showInformationMessage('CodeAlloy: No historical checkpoints recorded yet.');
+		return;
+	}
+
+	const items: (vscode.QuickPickItem & { commitHash: string })[] = timeline
+		.slice()
+		.reverse()
+		.map((entry) => {
+			const timeStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+			const fileCount = entry.filesModified ? entry.filesModified.length : 0;
+			const filesStr = fileCount > 0 ? entry.filesModified.join(', ') : 'No files modified';
+			return {
+				label: `$(history) #${entry.commitHash.substring(0, 8)} — ${timeStr}`,
+				description: entry.prompt,
+				detail: fileCount > 0 ? `Modified ${fileCount} file(s): ${filesStr}` : 'Advisory turn (read-only)',
+				commitHash: entry.commitHash
+			};
+		});
+
+	const selected = await vscode.window.showQuickPick(items, {
+		placeHolder: 'Select a checkpoint to restore workspace state'
+	});
+
+	if (selected) {
+		const ok = await shadowGit.rollbackToCommit(selected.commitHash);
+		if (ok) {
+			vscode.window.showInformationMessage(`CodeAlloy: Workspace reverted to historical checkpoint #${selected.commitHash.substring(0, 8)}.`);
+		} else {
+			vscode.window.showErrorMessage(`CodeAlloy: Failed to rollback to checkpoint #${selected.commitHash.substring(0, 8)}.`);
+		}
+	}
 }
 
 export function deactivate() {

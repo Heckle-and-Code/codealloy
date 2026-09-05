@@ -15,6 +15,10 @@
 	const emptyDesc = document.getElementById('emptyDesc');
 	const emptyActions = document.getElementById('emptyActions');
 	const autonomyDial = document.getElementById('autonomyDial');
+	const timelineBtn = document.getElementById('timelineBtn');
+	const timelineDrawer = document.getElementById('timelineDrawer');
+	const timelineCloseBtn = document.getElementById('timelineCloseBtn');
+	const timelineList = document.getElementById('timelineList');
 
 	let isStreaming = false;
 	let currentAssistantTurnId = null;
@@ -42,6 +46,38 @@
 			});
 		});
 	}
+
+	// Timeline Drawer Handlers (US-3.3)
+	if (timelineBtn && timelineDrawer) {
+		timelineBtn.addEventListener('click', function() {
+			const isVisible = timelineDrawer.style.display !== 'none';
+			timelineDrawer.style.display = isVisible ? 'none' : 'flex';
+			if (!isVisible) {
+				vscode.postMessage({ type: 'getTimeTravelTimeline' });
+			}
+		});
+	}
+
+	if (timelineCloseBtn && timelineDrawer) {
+		timelineCloseBtn.addEventListener('click', function() {
+			timelineDrawer.style.display = 'none';
+		});
+	}
+
+	window.undoTurn = function(assistantMsgId, commitHash) {
+		vscode.postMessage({
+			type: 'rollbackTurn',
+			assistantMsgId: assistantMsgId,
+			commitHash: commitHash
+		});
+	};
+
+	window.revertToTimelinePoint = function(commitHash) {
+		vscode.postMessage({
+			type: 'rollbackToTimelinePoint',
+			commitHash: commitHash
+		});
+	};
 
 	window.triggerSelectModel = function() {
 		vscode.postMessage({ type: 'selectModel' });
@@ -573,6 +609,74 @@
 
 					asstDiv.appendChild(card);
 					messagesContainer.scrollTop = messagesContainer.scrollHeight;
+				}
+				break;
+			}
+
+			case 'turnCheckpointed': {
+				const asstDiv = document.getElementById(message.assistantMsgId) ||
+				                pendingAssistantTurnEl ||
+				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
+				if (asstDiv) {
+					let actionsBar = asstDiv.querySelector('.turn-actions-bar');
+					if (!actionsBar) {
+						actionsBar = document.createElement('div');
+						actionsBar.className = 'turn-actions-bar';
+						asstDiv.appendChild(actionsBar);
+					}
+					const fileCount = message.modifiedFiles ? message.modifiedFiles.length : 0;
+					actionsBar.innerHTML =
+						'<button class="undo-turn-btn" id="undo-btn-' + escapeHtml(message.assistantMsgId) + '" ' +
+						'onclick="window.undoTurn(\'' + escapeHtml(message.assistantMsgId) + '\', \'' + escapeHtml(message.commitHash) + '\')" ' +
+						'title="Revert all changes made during this turn">' +
+						'<span>&#8630; Undo Turn</span> <span style="font-size: 9.5px; opacity: 0.85;">(' + fileCount + ' file' + (fileCount === 1 ? '' : 's') + ')</span>' +
+						'</button>';
+					messagesContainer.scrollTop = messagesContainer.scrollHeight;
+				}
+				break;
+			}
+
+			case 'turnRolledBack': {
+				const btn = document.getElementById('undo-btn-' + message.assistantMsgId);
+				if (btn) {
+					btn.className = 'undo-turn-btn reverted';
+					btn.innerHTML = '<span>&#10003; Reverted to pre-turn state</span>';
+				}
+				break;
+			}
+
+			case 'timelineLoaded': {
+				if (timelineList) {
+					const list = message.timeline || [];
+					if (list.length === 0) {
+						timelineList.innerHTML = '<div class="timeline-empty">No checkpoints recorded yet. Snapshots are taken before every agent turn.</div>';
+					} else {
+						timelineList.innerHTML = list.slice().reverse().map(function(item) {
+							const dateStr = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+							const fileCount = item.filesModified ? item.filesModified.length : 0;
+							const filesStr = fileCount > 0 ? item.filesModified.join(', ') : 'No files modified';
+							return '<div class="timeline-item">' +
+								'<div class="timeline-item-meta">' +
+									'<span>' + escapeHtml(dateStr) + '</span>' +
+									'<span class="timeline-commit-hash">#' + escapeHtml(item.commitHash.substring(0, 8)) + '</span>' +
+								'</div>' +
+								'<div class="timeline-prompt-preview" title="' + escapeHtml(item.prompt) + '">' + escapeHtml(item.prompt) + '</div>' +
+								'<div class="timeline-files-list" title="' + escapeHtml(filesStr) + '">' +
+									(fileCount > 0 ? '&#128221; ' + fileCount + ' file(s): ' + escapeHtml(filesStr) : 'Advisory / read-only') +
+								'</div>' +
+								'<button class="btn-revert-timeline" onclick="window.revertToTimelinePoint(\'' + escapeHtml(item.commitHash) + '\')">' +
+									'Revert to this point' +
+								'</button>' +
+							'</div>';
+						}).join('');
+					}
+				}
+				break;
+			}
+
+			case 'timelineRolledBack': {
+				if (timelineDrawer) {
+					timelineDrawer.style.display = 'none';
 				}
 				break;
 			}

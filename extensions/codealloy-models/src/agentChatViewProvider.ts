@@ -8,6 +8,7 @@ import * as os from 'os';
 import { exec } from 'child_process';
 import { LocalModelManager } from './modelManager';
 import { LlamaServerService } from './llamaServerService';
+import { ShadowGitService, TimelineEntry } from './shadowGitService';
 
 export interface ChatMessage {
 	id: string;
@@ -30,6 +31,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 	private readonly _onDidChangeAutonomyLevel = new vscode.EventEmitter<string>();
 	public readonly onDidChangeAutonomyLevel: vscode.Event<string> = this._onDidChangeAutonomyLevel.event;
 	private _pendingApprovals: Map<string, (decision: { approved: boolean; reason?: string }) => void> = new Map();
+	private _shadowGit?: ShadowGitService;
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
@@ -37,6 +39,24 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		private readonly _llamaServer: LlamaServerService
 	) {
 		this._outputChannel = vscode.window.createOutputChannel('CodeAlloy Agent Chat');
+	}
+
+	public getShadowGit(): ShadowGitService {
+		if (!this._shadowGit) {
+			const workspacePath = this._getWorkspacePath();
+			this._shadowGit = new ShadowGitService(workspacePath, this._outputChannel);
+		}
+		return this._shadowGit;
+	}
+
+	private _getWorkspacePath(): string {
+		const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+		if (workspaceFolder) return workspaceFolder;
+		const activeDoc = vscode.window.activeTextEditor?.document.uri;
+		if (activeDoc && activeDoc.scheme === 'file') {
+			return path.dirname(activeDoc.fsPath);
+		}
+		return process.env.CODEALLOY_WORKSPACE || '/Users/peter/source/Heckle and Code Projects/editor';
 	}
 
 	public getAutonomyLevel(): string {
@@ -111,6 +131,43 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 						this._pendingApprovals.delete(data.actionId);
 					}
 					break;
+				case 'rollbackTurn': {
+					const shadowGit = this.getShadowGit();
+					const ok = await shadowGit.rollbackToCommit(data.commitHash);
+					if (ok) {
+						vscode.window.showInformationMessage(`CodeAlloy: Successfully rolled back turn (${data.commitHash.substring(0, 8)}).`);
+						this._view?.webview.postMessage({
+							type: 'turnRolledBack',
+							assistantMsgId: data.assistantMsgId,
+							commitHash: data.commitHash
+						});
+					} else {
+						vscode.window.showErrorMessage(`CodeAlloy: Failed to rollback turn to checkpoint ${data.commitHash.substring(0, 8)}.`);
+					}
+					break;
+				}
+				case 'getTimeTravelTimeline': {
+					const timeline = this.getShadowGit().getHistoryTimeline();
+					this._view?.webview.postMessage({
+						type: 'timelineLoaded',
+						timeline
+					});
+					break;
+				}
+				case 'rollbackToTimelinePoint': {
+					const shadowGit = this.getShadowGit();
+					const ok = await shadowGit.rollbackToCommit(data.commitHash);
+					if (ok) {
+						vscode.window.showInformationMessage(`CodeAlloy: Workspace reverted to historical checkpoint (${data.commitHash.substring(0, 8)}).`);
+						this._view?.webview.postMessage({
+							type: 'timelineRolledBack',
+							commitHash: data.commitHash
+						});
+					} else {
+						vscode.window.showErrorMessage(`CodeAlloy: Failed to revert to checkpoint ${data.commitHash.substring(0, 8)}.`);
+					}
+					break;
+				}
 				case 'ready':
 					this._outputChannel.appendLine('[AgentChat] Webview reported ready');
 					this.syncState();
@@ -868,6 +925,13 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 		let totalAccumulatedDisplay = '';
 
+		// Sub-50ms atomic pre-turn snapshot (US-3.1)
+		const shadowGit = this.getShadowGit();
+		let preCommitHash: string | null = null;
+		if (!isReadOnly) {
+			preCommitHash = await shadowGit.createPreTurnSnapshot(assistantMsgId, prompt);
+		}
+
 		while (turnCount < MAX_AGENTIC_TURNS) {
 			turnCount++;
 			this._outputChannel.appendLine(`[AgentChat Loop] Turn ${turnCount}/${MAX_AGENTIC_TURNS} starting (mode: ${this._autonomyLevel})...`);
@@ -976,6 +1040,11 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			}
 		}
 
+		let modifiedFiles: string[] = [];
+		if (preCommitHash) {
+			modifiedFiles = await shadowGit.finalizeTurn(assistantMsgId, preCommitHash, prompt);
+		}
+
 		assistantMsg.content = totalAccumulatedDisplay;
 		if (this._view) {
 			this._view.webview.postMessage({
@@ -983,6 +1052,15 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 				assistantMsgId,
 				fullContent: assistantMsg.content
 			});
+
+			if (preCommitHash && modifiedFiles.length > 0) {
+				this._view.webview.postMessage({
+					type: 'turnCheckpointed',
+					assistantMsgId,
+					commitHash: preCommitHash,
+					modifiedFiles
+				});
+			}
 		}
 	}
 
@@ -1652,6 +1730,167 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			color: var(--ca-text-muted);
 			margin-left: auto;
 		}
+
+		/* Turn Checkpoint & Undo Button (US-3.2) */
+		.turn-actions-bar {
+			display: flex;
+			align-items: center;
+			justify-content: flex-end;
+			margin-top: 8px;
+			gap: 8px;
+		}
+
+		.undo-turn-btn {
+			background: rgba(224, 108, 117, 0.12);
+			border: 1px solid rgba(224, 108, 117, 0.35);
+			color: #E06C75 !important;
+			border-radius: 4px;
+			padding: 3px 8px;
+			font-size: 10.5px;
+			font-weight: 600;
+			cursor: pointer;
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			transition: all 0.15s ease;
+		}
+
+		.undo-turn-btn:hover {
+			background: rgba(224, 108, 117, 0.25);
+			border-color: #E06C75;
+		}
+
+		.undo-turn-btn.reverted {
+			background: rgba(140, 140, 140, 0.15);
+			border-color: var(--ca-border);
+			color: var(--ca-text-muted) !important;
+			pointer-events: none;
+		}
+
+		/* Time-Travel History Drawer (US-3.3) */
+		.timeline-drawer {
+			position: absolute;
+			top: 66px;
+			left: 0;
+			right: 0;
+			max-height: 280px;
+			background: var(--ca-surface);
+			border-bottom: 2px solid var(--ca-border);
+			z-index: 100;
+			display: flex;
+			flex-direction: column;
+			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+			animation: slideDown 0.15s ease;
+		}
+
+		@keyframes slideDown {
+			from { transform: translateY(-10px); opacity: 0; }
+			to { transform: translateY(0); opacity: 1; }
+		}
+
+		.timeline-drawer-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 8px 12px;
+			background: rgba(217, 119, 6, 0.12);
+			border-bottom: 1px solid var(--ca-border);
+			font-size: 11px;
+			font-weight: 700;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+			color: var(--ca-gold);
+		}
+
+		.timeline-close-btn {
+			background: transparent;
+			border: none;
+			color: var(--ca-text-muted);
+			font-size: 16px;
+			cursor: pointer;
+			padding: 0 4px;
+			line-height: 1;
+		}
+
+		.timeline-close-btn:hover {
+			color: #ECEFF4;
+		}
+
+		.timeline-drawer-list {
+			overflow-y: auto;
+			padding: 8px;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			max-height: 230px;
+		}
+
+		.timeline-empty {
+			font-size: 11px;
+			color: var(--ca-text-muted);
+			text-align: center;
+			padding: 16px;
+		}
+
+		.timeline-item {
+			background: var(--ca-bg);
+			border: 1px solid var(--ca-border);
+			border-radius: 6px;
+			padding: 8px 10px;
+			display: flex;
+			flex-direction: column;
+			gap: 4px;
+		}
+
+		.timeline-item-meta {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			font-size: 10.5px;
+			color: var(--ca-text-muted);
+		}
+
+		.timeline-commit-hash {
+			font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+			color: var(--ca-amber);
+			font-weight: 600;
+		}
+
+		.timeline-prompt-preview {
+			font-size: 12px;
+			color: #ECEFF4;
+			font-weight: 500;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.timeline-files-list {
+			font-size: 10.5px;
+			color: #4EBD79;
+			font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+
+		.btn-revert-timeline {
+			align-self: flex-end;
+			background: rgba(224, 108, 117, 0.15);
+			border: 1px solid rgba(224, 108, 117, 0.35);
+			color: #E06C75 !important;
+			border-radius: 4px;
+			padding: 2px 8px;
+			font-size: 10.5px;
+			font-weight: 600;
+			cursor: pointer;
+			margin-top: 2px;
+			transition: background 0.15s ease;
+		}
+
+		.btn-revert-timeline:hover {
+			background: rgba(224, 108, 117, 0.3);
+		}
 	</style>
 </head>
 <body>
@@ -1661,7 +1900,21 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 				<div class="status-dot" id="statusDot"></div>
 				<span id="modelName">Checking Engine...</span>
 			</div>
-			<button class="clear-btn" id="clearBtn" title="Clear conversation">Clear</button>
+			<div style="display: flex; gap: 4px; align-items: center;">
+				<button class="clear-btn" id="timelineBtn" title="View historical checkpoints & time-travel">&#9201; Timeline</button>
+				<button class="clear-btn" id="clearBtn" title="Clear conversation">Clear</button>
+			</div>
+		</div>
+
+		<!-- History Timeline Drawer (US-3.3) -->
+		<div class="timeline-drawer" id="timelineDrawer" style="display: none;">
+			<div class="timeline-drawer-header">
+				<span>&#9201; Time-Travel Checkpoints</span>
+				<button class="timeline-close-btn" id="timelineCloseBtn">&times;</button>
+			</div>
+			<div class="timeline-drawer-list" id="timelineList">
+				<div class="timeline-empty">No checkpoints recorded yet. Snapshots are taken before every agent turn.</div>
+			</div>
 		</div>
 
 		<!-- Autonomy Dial -->

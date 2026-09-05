@@ -46,6 +46,21 @@
         "command": "codealloy.switchProvider",
         "title": "CodeAlloy: Switch Inference Engine Provider",
         "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.selectAutonomy",
+        "title": "CodeAlloy: Select Autonomy Level",
+        "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.undoLastTurn",
+        "title": "CodeAlloy: Undo Last Agent Turn (Rollback)",
+        "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.timeTravelTimeline",
+        "title": "CodeAlloy: Time-Travel History Scrubber",
+        "category": "CodeAlloy"
       }
     ],
     "viewsContainers": {

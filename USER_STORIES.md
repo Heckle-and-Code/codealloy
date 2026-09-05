@@ -128,23 +128,23 @@ CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle 
 
 ---
 
-## Epic 3: Shadow Git Checkpoints & Time-Travel Rollback
+## Epic 3: Shadow Git Checkpoints & Time-Travel Rollback `[COMPLETED]`
 
-### US-3.1: Sub-5ms Atomic Pre-Turn Snapshots
+### US-3.1: Sub-5ms Atomic Pre-Turn Snapshots `[COMPLETED]`
 * **User Story**: As a developer, I want CodeAlloy to automatically take a sub-5ms snapshot of my project before any agent turn executes, so that my codebase is protected without any noticeable latency.
 * **Acceptance Criteria**:
   * **AC 3.1.1**: The engine initializes a headless Git store in `~/.codealloy/projects/<hash>/history.git`.
   * **AC 3.1.2**: Before executing any modifying tool in a turn, the engine executes `git write-tree` and `git commit-tree` pointing to the workspace directory.
   * **AC 3.1.3**: The operation completes in $< 10\text{ ms}$ and does not create, touch, or modify any `.git` folder in the user's workspace.
 
-### US-3.2: 1-Click Turn Rollback
+### US-3.2: 1-Click Turn Rollback `[COMPLETED]`
 * **User Story**: As a developer, I want an **[Undo Turn]** button on every agent turn card, so that if the model's changes are undesirable, I can revert all touched files in one click.
 * **Acceptance Criteria**:
   * **AC 3.2.1**: Clicking **[Undo Turn]** triggers `git checkout <pre-turn-tree-id> -- .` against the workspace.
   * **AC 3.2.2**: All modified, deleted, and newly created files for that turn are restored to their exact pre-turn state.
   * **AC 3.2.3**: The editor buffers refresh immediately, reflecting the rollback without requiring IDE restart.
 
-### US-3.3: Historical Time-Travel Scrubber
+### US-3.3: Historical Time-Travel Scrubber `[COMPLETED]`
 * **User Story**: As a developer, I want to view a timeline of all previous turns in the current session and revert back 5 steps, so that I can recover from a compounding agent mistake.
 * **Acceptance Criteria**:
   * **AC 3.3.1**: The history view lists each turn with timestamp, user prompt, and files modified.
