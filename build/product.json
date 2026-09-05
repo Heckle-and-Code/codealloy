@@ -9,6 +9,9 @@
   "linuxIconName": "codealloy",
   "licenseName": "MIT",
   "licenseUrl": "https://github.com/Heckle-and-Code/codealloy/blob/main/LICENSE",
+  "licenseFileName": "LICENSE.txt",
+  "quality": "stable",
+  "serverDataFolderName": ".codealloy-remote",
   "reportIssueUrl": "https://github.com/Heckle-and-Code/codealloy/issues",
   "urlProtocol": "codealloy",
   "extensionsGallery": {
