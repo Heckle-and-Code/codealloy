@@ -145,8 +145,17 @@ fi
 # 4. Patch native spdlog for macOS Xcode 16 Clang consteval compatibility
 echo ""
 echo "🔧 Applying platform compatibility patches..."
-sed -i '' 's/"@vscode\/spdlog": "\^0.15.0"/"@vscode\/spdlog": "0.15.8"/g' "${BUILD_CACHE_DIR}/package.json" 2>/dev/null || true
-sed -i '' 's/"@vscode\/spdlog": "0.15.1"/"@vscode\/spdlog": "0.15.8"/g' "${BUILD_CACHE_DIR}/package-lock.json" 2>/dev/null || true
+node -e "
+  const fs = require('fs');
+  const p1 = '${BUILD_CACHE_DIR}/package.json';
+  if (fs.existsSync(p1)) {
+    fs.writeFileSync(p1, fs.readFileSync(p1, 'utf8').replace(/\"@vscode\/spdlog\": \"\^0\.15\.0\"/g, '\"@vscode\/spdlog\": \"0.15.8\"'));
+  }
+  const p2 = '${BUILD_CACHE_DIR}/package-lock.json';
+  if (fs.existsSync(p2)) {
+    fs.writeFileSync(p2, fs.readFileSync(p2, 'utf8').replace(/\"@vscode\/spdlog\": \"0\.15\.1\"/g, '\"@vscode\/spdlog\": \"0.15.8\"'));
+  }
+" 2>/dev/null || true
 
 # 5. Installing dependencies across all subprojects
 echo ""

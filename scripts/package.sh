@@ -27,8 +27,13 @@ fi
 mkdir -p "${DIST_DIR}"
 VERSION=$(node -p "require('${ROOT_DIR}/package.json').version" 2>/dev/null || echo "0.1.0-alpha.1")
 
+export NODE_OPTIONS="--max-old-space-size=8192"
+
 echo "📦 Packaging CodeAlloy v${VERSION}..."
 cd "${UPSTREAM_DIR}"
+
+echo "  ⚡ Transpiling client and extensions..."
+npm run gulp transpile-client-esbuild transpile-extensions
 
 UNAME_OUT="$(uname -s)"
 case "${UNAME_OUT}" in
@@ -45,7 +50,7 @@ case "${UNAME_OUT}" in
         fi
 
         echo "  🔨 Running gulp ${TARGET}..."
-        npx gulp "${TARGET}"
+        npm run gulp "${TARGET}"
 
         PARENT_DIR="$(cd "${UPSTREAM_DIR}/.." && pwd)"
         SEARCH_APP="${PARENT_DIR}/${BUILD_FOLDER}"
@@ -75,7 +80,7 @@ case "${UNAME_OUT}" in
 
     Linux*)
         echo "  🔨 Running gulp vscode-linux-x64..."
-        npx gulp vscode-linux-x64
+        npm run gulp vscode-linux-x64
         PARENT_DIR="$(cd "${UPSTREAM_DIR}/.." && pwd)"
         LINUX_OUT="${PARENT_DIR}/VSCode-linux-x64"
         if [ -d "${LINUX_OUT}" ]; then
@@ -86,7 +91,7 @@ case "${UNAME_OUT}" in
 
     CYGWIN*|MINGW*|MSYS*)
         echo "  🔨 Running gulp vscode-win32-x64..."
-        npx gulp vscode-win32-x64
+        npm run gulp vscode-win32-x64
         PARENT_DIR="$(cd "${UPSTREAM_DIR}/.." && pwd)"
         WIN_OUT="${PARENT_DIR}/VSCode-win32-x64"
         if [ -d "${WIN_OUT}" ]; then

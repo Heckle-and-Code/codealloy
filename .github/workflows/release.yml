@@ -47,6 +47,9 @@ jobs:
             runner: windows-latest
             pkg_name: CodeAlloy-win32-x64
 
+    env:
+      NODE_OPTIONS: "--max-old-space-size=8192"
+
     steps:
       - name: Checkout CodeAlloy Repository
         uses: actions/checkout@v4
