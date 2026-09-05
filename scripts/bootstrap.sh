@@ -51,6 +51,20 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 echo "  ✓ python3: $(python3 --version)"
 
+if [ "$(uname)" = "Linux" ]; then
+    if ! command -v pkg-config >/dev/null 2>&1 || ! pkg-config --exists x11 xkbfile 2>/dev/null; then
+        echo ""
+        echo "⚠️  Missing Linux native development headers for Code-OSS (X11 & xkbfile)."
+        echo "   Please install them using your package manager:"
+        echo "   • Fedora / RHEL:   sudo dnf install libX11-devel libxkbfile-devel libsecret-devel krb5-devel gcc-c++ make"
+        echo "   • Ubuntu / Debian: sudo apt-get install libx11-dev libxkbfile-dev libsecret-1-dev libkrb5-dev build-essential"
+        echo "   • Arch Linux:      sudo pacman -S libx11 libxkbfile libsecret krb5 base-devel"
+        echo ""
+    else
+        echo "  ✓ linux headers: x11, xkbfile detected"
+    fi
+fi
+
 # 2. Fetching Upstream Code-OSS in space-free build cache
 echo ""
 echo "📦 Setting up Code-OSS base at ${BUILD_CACHE_DIR}..."
