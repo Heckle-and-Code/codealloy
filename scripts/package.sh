@@ -75,17 +75,22 @@ case "${UNAME_OUT}" in
         APP_BUNDLE=$(find "${SEARCH_APP}" -maxdepth 2 -name "*.app" | head -n 1)
 
         if [ -n "${APP_BUNDLE}" ] && [ -d "${APP_BUNDLE}" ]; then
+            if command -v codesign >/dev/null 2>&1; then
+                echo "  🔏 Ad-hoc codesigning ${APP_BUNDLE}..."
+                codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || true
+            fi
+
             echo "  📦 Creating ${OUT_NAME}.zip..."
-            (cd "$(dirname "${APP_BUNDLE}")" && zip -r -q "${DIST_DIR}/${OUT_NAME}.zip" "$(basename "${APP_BUNDLE}")")
+            ditto -c -k --keepParent "${APP_BUNDLE}" "${DIST_DIR}/${OUT_NAME}.zip"
 
             if command -v hdiutil >/dev/null 2>&1; then
                 echo "  💿 Creating ${OUT_NAME}.dmg..."
                 DMG_TMP="${DIST_DIR}/tmp_dmg"
                 rm -rf "${DMG_TMP}"
                 mkdir -p "${DMG_TMP}"
-                cp -R "${APP_BUNDLE}" "${DMG_TMP}/"
+                ditto "${APP_BUNDLE}" "${DMG_TMP}/$(basename "${APP_BUNDLE}")"
                 ln -s /Applications "${DMG_TMP}/Applications"
-                hdiutil create -volname "CodeAlloy" -srcfolder "${DMG_TMP}" -ov -format UDZO "${DIST_DIR}/${OUT_NAME}.dmg" -quiet
+                hdiutil create -volname "CodeAlloy" -srcfolder "${DMG_TMP}" -ov -format UDZO -fs HFS+ "${DIST_DIR}/${OUT_NAME}.dmg" -quiet
                 rm -rf "${DMG_TMP}"
                 echo "  ✓ Generated: ${DIST_DIR}/${OUT_NAME}.dmg"
             fi

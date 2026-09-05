@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.1.0-alpha.2] - 2026-09-05
+
+### Fixed
+- **macOS DMG Packaging (Finder Error -36)**: Explicitly enforced standard `-fs HFS+` filesystem for `hdiutil create` compressed DMGs (`UDZO`), fixing a macOS Sonoma APFS compression bug that caused Finder I/O read errors on launch.
+- **App Bundle Staging**: Replaced standard Unix `cp -R` with Apple's native `ditto` in `package.sh` to preserve framework symlinks, extended attributes, and permissions without corruption.
+- **macOS Gatekeeper Code Signature**: Added automatic ad-hoc codesigning (`codesign --force --deep --sign -`) during packaging to prevent macOS from flagging modified bundles as damaged or malicious.
+- **Zip Archiving**: Standardized `.zip` packaging using `ditto -c -k --keepParent` for clean, uncorrupted bundle extractions.
+
+---
+
 ## [0.1.0-alpha.1] - 2026-09-05
 
 ### Initial Developer Preview: "Where developer intent meets open models"
