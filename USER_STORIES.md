@@ -167,15 +167,15 @@ CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle 
 
 ---
 
-## Epic 5: Code-OSS Workbench Customization & Inline Diffs
+## Epic 5: Code-OSS Workbench Customization & Inline Diffs `[COMPLETED]`
 
-### US-5.1: Native Inline Multi-Line Streaming Diffs
+### US-5.1: Native Inline Multi-Line Streaming Diffs `[COMPLETED]`
 * **User Story**: As a developer reviewing agent edits, I want the code modifications to stream directly inside the active editor buffer with red/green diff highlights, so that I can accept or reject chunks using keyboard shortcuts.
 * **Acceptance Criteria**:
   * **AC 5.1.1**: When the agent modifies the active file, changes render inline with green addition and red deletion decorations.
   * **AC 5.1.2**: Pressing `Tab` accepts the current diff chunk; pressing `Esc` rejects the chunk; pressing `Cmd+Enter` accepts all chunks.
 
-### US-5.2: Model Context Protocol (MCP) Integration
+### US-5.2: Model Context Protocol (MCP) Integration `[COMPLETED]`
 * **User Story**: As a developer, I want CodeAlloy to connect to MCP servers (e.g., PostgreSQL, GitHub, custom internal APIs), so that my local model can query external tools.
 * **Acceptance Criteria**:
   * **AC 5.2.1**: CodeAlloy reads standard MCP configuration files (`mcp_config.json`).

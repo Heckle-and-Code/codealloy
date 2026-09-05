@@ -91,6 +91,24 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.acceptDiffChunk', async () => {
+			await chatProvider.getDiffService().acceptCurrentChunk();
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.rejectDiffChunk', async () => {
+			await chatProvider.getDiffService().rejectCurrentChunk();
+		})
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.acceptAllDiffs', async () => {
+			await chatProvider.getDiffService().acceptAllChunks();
+		})
+	);
+
+	context.subscriptions.push(
 		vscode.commands.registerCommand('codealloy.selectModel', async () => {
 			await showModelPicker();
 		})
@@ -626,5 +644,9 @@ export function deactivate() {
 	}
 	if (chatStatusBarItem) {
 		chatStatusBarItem.dispose();
+	}
+	if (chatProvider) {
+		chatProvider.getDiffService().dispose();
+		chatProvider.getMcpService().dispose();
 	}
 }

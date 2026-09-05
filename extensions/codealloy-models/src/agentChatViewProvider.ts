@@ -9,6 +9,8 @@ import { exec } from 'child_process';
 import { LocalModelManager } from './modelManager';
 import { LlamaServerService } from './llamaServerService';
 import { ShadowGitService, TimelineEntry } from './shadowGitService';
+import { InlineDiffService } from './inlineDiffService';
+import { McpService } from './mcpService';
 
 export interface ChatMessage {
 	id: string;
@@ -32,6 +34,8 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 	public readonly onDidChangeAutonomyLevel: vscode.Event<string> = this._onDidChangeAutonomyLevel.event;
 	private _pendingApprovals: Map<string, (decision: { approved: boolean; reason?: string }) => void> = new Map();
 	private _shadowGit?: ShadowGitService;
+	private _diffService?: InlineDiffService;
+	private _mcpService?: McpService;
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
@@ -47,6 +51,21 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			this._shadowGit = new ShadowGitService(workspacePath, this._outputChannel);
 		}
 		return this._shadowGit;
+	}
+
+	public getDiffService(): InlineDiffService {
+		if (!this._diffService) {
+			this._diffService = new InlineDiffService();
+		}
+		return this._diffService;
+	}
+
+	public getMcpService(): McpService {
+		if (!this._mcpService) {
+			const workspacePath = this._getWorkspacePath();
+			this._mcpService = new McpService(workspacePath, this._outputChannel);
+		}
+		return this._mcpService;
 	}
 
 	private _getWorkspacePath(): string {
@@ -348,15 +367,26 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 				await vscode.workspace.fs.createDirectory(dirUri);
 			} catch {}
 
-			// Write content to disk
-			await vscode.workspace.fs.writeFile(targetUri, Buffer.from(content, 'utf8'));
-			const relPath = workspaceFolder ? vscode.workspace.asRelativePath(targetUri) : targetUri.fsPath;
+			// Check if file is already open in the active text editor for native inline diffs (US-5.1)
+			const activeEditor = vscode.window.activeTextEditor;
+			const isCurrentlyActive = activeEditor && activeEditor.document.uri.fsPath === targetUri.fsPath;
+
+			if (isCurrentlyActive && fs.existsSync(targetUri.fsPath)) {
+				this._outputChannel.appendLine(`[AgentChat] Rendering inline diff in active editor for: ${targetUri.fsPath}`);
+				const accepted = await this.getDiffService().showDiff(activeEditor, content);
+				if (!accepted) {
+					this._outputChannel.appendLine(`[AgentChat] Inline diff rejected by user.`);
+					return false;
+				}
+			} else {
+				// Write content to disk
+				await vscode.workspace.fs.writeFile(targetUri, Buffer.from(content, 'utf8'));
+				// Open file in active editor area (column 1 next to sidebar)
+				const doc = await vscode.workspace.openTextDocument(targetUri);
+				await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.One });
+			}
+
 			this._outputChannel.appendLine(`[AgentChat] Successfully wrote file to filesystem: ${targetUri.fsPath} (${content.length} bytes)`);
-
-			// Open file in active editor area (column 1 next to sidebar)
-			const doc = await vscode.workspace.openTextDocument(targetUri);
-			await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.One });
-
 			vscode.window.showInformationMessage(`CodeAlloy: Created "${path.basename(targetUri.fsPath)}" at ${targetUri.fsPath}`);
 
 			// Notify webview with confirmation
@@ -840,6 +870,12 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 		// 4. Tool Definitions based on Autonomy Level
 		const isReadOnly = this._autonomyLevel === 'L0' || this._autonomyLevel === 'L1';
+		const mcpService = this.getMcpService();
+		if (!isReadOnly) {
+			await mcpService.init();
+		}
+		const mcpTools = isReadOnly ? [] : mcpService.getOpenAiTools();
+
 		const tools = isReadOnly
 			? []
 			: [
@@ -871,7 +907,8 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 							required: ['command']
 						}
 					}
-				}
+				},
+				...mcpTools
 			];
 
 		let systemPrompt = '';
@@ -1031,6 +1068,14 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 						content: ok
 							? `File "${action.arguments.path}" successfully created and opened in editor.`
 							: `Failed to write file "${action.arguments.path}".`
+					});
+				} else if (mcpService.isMcpTool(action.name)) {
+					this._outputChannel.appendLine(`[AgentChat] Calling MCP tool "${action.name}" with args: ${JSON.stringify(action.arguments)}`);
+					const res = await mcpService.callTool(action.name, action.arguments);
+					conversationMessages.push({
+						role: 'tool',
+						name: action.name,
+						content: res.success ? res.output : `MCP Tool failed: ${res.output}`
 					});
 				}
 			}

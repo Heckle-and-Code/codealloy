@@ -61,6 +61,41 @@
         "command": "codealloy.timeTravelTimeline",
         "title": "CodeAlloy: Time-Travel History Scrubber",
         "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.acceptDiffChunk",
+        "title": "CodeAlloy: Accept Current Diff Chunk",
+        "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.rejectDiffChunk",
+        "title": "CodeAlloy: Reject Current Diff Chunk",
+        "category": "CodeAlloy"
+      },
+      {
+        "command": "codealloy.acceptAllDiffs",
+        "title": "CodeAlloy: Accept All Diff Chunks",
+        "category": "CodeAlloy"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "codealloy.acceptDiffChunk",
+        "key": "tab",
+        "when": "codealloy.hasActiveDiff && editorTextFocus"
+      },
+      {
+        "command": "codealloy.rejectDiffChunk",
+        "key": "escape",
+        "when": "codealloy.hasActiveDiff && editorTextFocus"
+      },
+      {
+        "command": "codealloy.acceptAllDiffs",
+        "key": "cmd+enter",
+        "mac": "cmd+enter",
+        "win": "ctrl+enter",
+        "linux": "ctrl+enter",
+        "when": "codealloy.hasActiveDiff && editorTextFocus"
       }
     ],
     "viewsContainers": {
