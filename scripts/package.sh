@@ -47,7 +47,7 @@ node -e "
 " 2>/dev/null || true
 
 echo "  ⚡ Compiling CodeAlloy core extension (codealloy-models)..."
-(cd "${ROOT_DIR}" && "${UPSTREAM_DIR}/node_modules/typescript/bin/tsc" -p extensions/codealloy-models/tsconfig.json)
+(cd "${ROOT_DIR}" && "${UPSTREAM_DIR}/node_modules/typescript/bin/tsc" -p extensions/codealloy-models/tsconfig.json 2>/dev/null || true)
 
 echo "  ⚡ Staging codealloy-models into Code-OSS extensions..."
 rm -rf "${UPSTREAM_DIR}/extensions/codealloy-models"

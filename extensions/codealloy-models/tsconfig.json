@@ -14,11 +14,11 @@
     "moduleResolution": "node",
     "skipLibCheck": true,
     "typeRoots": [
-      "/Users/peter/.codealloy/build/code-oss/node_modules/@types"
+      "./node_modules/@types"
     ]
   },
   "include": [
     "src",
-    "/Users/peter/.codealloy/build/code-oss/src/vscode-dts/vscode.d.ts"
+    "vscode.d.ts"
   ]
 }
