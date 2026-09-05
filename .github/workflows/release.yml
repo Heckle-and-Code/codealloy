@@ -95,19 +95,21 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          # Move distribution packages from .build or out to dist
-          find . -maxdepth 3 -name "CodeAlloy-*" -o -name "codealloy_*" | while read -r f; do
-            if [ -f "$f" ]; then
-              cp "$f" dist/
-            elif [ -d "$f" ] && [[ "$f" == *.app ]]; then
-              zip -r "dist/${{ matrix.target.pkg_name }}.zip" "$f"
+          # Move distribution packages from outside dist into dist
+          find . -maxdepth 3 \( -name "CodeAlloy-*" -o -name "codealloy_*" \) | while read -r f; do
+            if [[ "$f" != "./dist/"* ]] && [[ "$f" != "dist/"* ]]; then
+              if [ -f "$f" ]; then
+                cp "$f" dist/
+              elif [ -d "$f" ] && [[ "$f" == *.app ]]; then
+                zip -r "dist/${{ matrix.target.pkg_name }}.zip" "$f"
+              fi
             fi
           done
           
           cd dist
           for asset in *; do
-            if [ -f "$asset" ] && [[ "$asset" != *.sha256 ]]; then
-              shasum -a 256 "$asset" > "${asset}.sha256" || sha256sum "$asset" > "${asset}.sha256"
+            if [ -f "$asset" ] && [[ "$asset" != *.sha256 ]] && [[ "$asset" != "checksums.txt" ]]; then
+              shasum -a 256 "$asset" > "${asset}.sha256" 2>/dev/null || sha256sum "$asset" > "${asset}.sha256" 2>/dev/null || true
             fi
           done
 
@@ -167,6 +169,8 @@ jobs:
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref_name || inputs.tag_name }}
           name: CodeAlloy ${{ github.ref_name || inputs.tag_name }}
