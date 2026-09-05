@@ -1,8 +1,5 @@
 # Dependencies
 node_modules/
-!extensions/codealloy-models/node_modules/
-!extensions/codealloy-models/node_modules/@types/
-!extensions/codealloy-models/node_modules/@types/node/
 .pnpm-store/
 npm-debug.log*
 yarn-debug.log*

@@ -52,7 +52,12 @@ echo "  ⚡ Compiling CodeAlloy core extension (codealloy-models)..."
 echo "  ⚡ Staging codealloy-models into Code-OSS extensions..."
 rm -rf "${UPSTREAM_DIR}/extensions/codealloy-models"
 mkdir -p "${UPSTREAM_DIR}/extensions/codealloy-models"
-cp -R "${ROOT_DIR}/extensions/codealloy-models/"* "${UPSTREAM_DIR}/extensions/codealloy-models/"
+cp "${ROOT_DIR}/extensions/codealloy-models/package.json" "${UPSTREAM_DIR}/extensions/codealloy-models/"
+cp -R "${ROOT_DIR}/extensions/codealloy-models/out" "${UPSTREAM_DIR}/extensions/codealloy-models/"
+if [ -d "${ROOT_DIR}/extensions/codealloy-models/resources" ]; then
+    cp -R "${ROOT_DIR}/extensions/codealloy-models/resources" "${UPSTREAM_DIR}/extensions/codealloy-models/"
+fi
+rm -rf "${UPSTREAM_DIR}/extensions/codealloy-models/node_modules"
 
 echo "  ⚡ Transpiling client and extensions..."
 npm run gulp transpile-client-esbuild transpile-extensions

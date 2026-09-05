@@ -12,10 +12,7 @@
     "strict": false,
     "noImplicitAny": false,
     "moduleResolution": "node",
-    "skipLibCheck": true,
-    "typeRoots": [
-      "./node_modules/@types"
-    ]
+    "skipLibCheck": true
   },
   "include": [
     "src",
