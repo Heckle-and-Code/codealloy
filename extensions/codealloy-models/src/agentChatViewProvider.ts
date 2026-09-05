@@ -25,8 +25,11 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 	private _activeRequest?: http.ClientRequest;
 	private _currentPrompt?: string;
 	private _currentAssistantMsg?: ChatMessage;
-	private _autonomyLevel: string = 'L2'; // L0, L1, L2 (Supervisor), L3, L4
+	private _autonomyLevel: string = 'L3'; // L0, L1, L2 (Supervisor), L3 (Guarded), L4 (Autonomous)
 	private _outputChannel: vscode.OutputChannel;
+	private readonly _onDidChangeAutonomyLevel = new vscode.EventEmitter<string>();
+	public readonly onDidChangeAutonomyLevel: vscode.Event<string> = this._onDidChangeAutonomyLevel.event;
+	private _pendingApprovals: Map<string, (decision: { approved: boolean; reason?: string }) => void> = new Map();
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
@@ -34,6 +37,18 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		private readonly _llamaServer: LlamaServerService
 	) {
 		this._outputChannel = vscode.window.createOutputChannel('CodeAlloy Agent Chat');
+	}
+
+	public getAutonomyLevel(): string {
+		return this._autonomyLevel;
+	}
+
+	public setAutonomyLevel(level: string): void {
+		if (this._autonomyLevel !== level) {
+			this._autonomyLevel = level;
+			this._onDidChangeAutonomyLevel.fire(level);
+			this.syncState();
+		}
 	}
 
 	public resolveWebviewView(
@@ -82,8 +97,19 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 					await vscode.commands.executeCommand('codealloy.selectModel');
 					break;
 				case 'setAutonomy':
-					this._autonomyLevel = data.level;
-					this.syncState();
+					this.setAutonomyLevel(data.level);
+					break;
+				case 'actionApproved':
+					if (this._pendingApprovals.has(data.actionId)) {
+						this._pendingApprovals.get(data.actionId)!({ approved: true });
+						this._pendingApprovals.delete(data.actionId);
+					}
+					break;
+				case 'actionRejected':
+					if (this._pendingApprovals.has(data.actionId)) {
+						this._pendingApprovals.get(data.actionId)!({ approved: false, reason: data.reason || 'User rejected this action' });
+						this._pendingApprovals.delete(data.actionId);
+					}
 					break;
 				case 'ready':
 					this._outputChannel.appendLine('[AgentChat] Webview reported ready');
@@ -183,8 +209,63 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
+	private _isDangerousCommand(command: string): boolean {
+		return (
+			/\brm\s+-rf\s+[/~]/i.test(command) ||
+			/\bsudo\b/i.test(command) ||
+			/\bgit\s+push\s+.*--force/i.test(command) ||
+			/\bcurl\b.*\|\s*(ba)?sh/i.test(command) ||
+			/\bwget\b.*\|\s*(ba)?sh/i.test(command) ||
+			/\bmkfs\b/i.test(command) ||
+			/\bdd\s+if=/i.test(command)
+		);
+	}
+
+	private async _requestUserApproval(
+		type: 'file' | 'command',
+		target: string,
+		details: string,
+		assistantMsgId: string
+	): Promise<{ approved: boolean; reason?: string }> {
+		const actionId = `act-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+		if (this._view) {
+			this._view.webview.postMessage({
+				type: 'actionApprovalRequired',
+				actionId,
+				actionType: type,
+				target,
+				details,
+				assistantMsgId
+			});
+		}
+
+		return new Promise((resolve) => {
+			this._pendingApprovals.set(actionId, resolve);
+		});
+	}
+
 	private async _executeFileAction(fileName: string, content: string, assistantMsgId: string): Promise<boolean> {
 		try {
+			// L0 Assist: Read-only advisory mode
+			if (this._autonomyLevel === 'L0') {
+				this._outputChannel.appendLine(`[AgentChat L0] Blocked file write to "${fileName}" in Read-Only Assist mode.`);
+				vscode.window.showWarningMessage(`CodeAlloy: File modification blocked in L0 Assist (read-only) mode.`);
+				return false;
+			}
+
+			// L2 Supervised: 1-click human approval
+			if (this._autonomyLevel === 'L2') {
+				const lineCount = content.split('\n').length;
+				const preview = content.length > 350
+					? content.substring(0, 350) + `\n... (+${content.length - 350} chars, ${lineCount} lines total)`
+					: content;
+				const approval = await this._requestUserApproval('file', fileName, preview, assistantMsgId);
+				if (!approval.approved) {
+					this._outputChannel.appendLine(`[AgentChat L2] User rejected file write for "${fileName}": ${approval.reason}`);
+					return false;
+				}
+			}
+
 			const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri;
 			let targetUri: vscode.Uri;
 			if (workspaceFolder) {
@@ -245,11 +326,34 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			process.env.CODEALLOY_WORKSPACE ||
 			'/Users/peter/source/Heckle and Code Projects/editor';
 
-		// US-2.3 Safety guardrail: reject destructive root commands
-		if (/\brm\s+-rf\s+\/($|\s)/.test(command) || /\bsudo\b/.test(command)) {
-			this._outputChannel.appendLine(`[AgentChat Command Blocked]: "${command}"`);
-			vscode.window.showErrorMessage(`CodeAlloy: Command blocked by safety guard: "${command}"`);
-			return { success: false, output: 'Command blocked by safety guardrail.' };
+		// L0 Assist: Read-only mode
+		if (this._autonomyLevel === 'L0') {
+			this._outputChannel.appendLine(`[AgentChat L0] Blocked shell command in Read-Only Assist mode.`);
+			vscode.window.showWarningMessage(`CodeAlloy: Command execution blocked in L0 Assist (read-only) mode.`);
+			return { success: false, output: 'Command execution disabled in L0 Assist mode.' };
+		}
+
+		// Security guardrail for dangerous operations (US-2.3)
+		if (this._isDangerousCommand(command)) {
+			this._outputChannel.appendLine(`[AgentChat Dangerous Command Intercepted]: "${command}"`);
+			const choice = await vscode.window.showWarningMessage(
+				`CodeAlloy Security Guard:\n\nThe agent proposed executing a sensitive or destructive command:\n"${command}"\n\nDo you want to allow this command to run?`,
+				{ modal: true },
+				'Approve Command',
+				'Block Command'
+			);
+			if (choice !== 'Approve Command') {
+				return { success: false, output: 'Command blocked by user security guard.' };
+			}
+		}
+
+		// L2 Supervised: 1-click human approval
+		if (this._autonomyLevel === 'L2') {
+			const approval = await this._requestUserApproval('command', command, `Execute in workspace root:\n$ ${command}`, assistantMsgId);
+			if (!approval.approved) {
+				this._outputChannel.appendLine(`[AgentChat L2] User rejected command "${command}": ${approval.reason}`);
+				return { success: false, output: `Command rejected by user: ${approval.reason || 'User declined permission'}` };
+			}
 		}
 
 		this._outputChannel.appendLine(`[AgentChat] Executing shell command in ${workspaceFolder}: ${command}`);
@@ -677,54 +781,82 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			this._outputChannel.appendLine(`[AgentChat] Using external provider at ${externalEndpoint} for model: ${activeModel}`);
 		}
 
-		// 4. Tool Definitions
-		const tools = [
-			{
-				type: 'function',
-				function: {
-					name: 'write_file',
-					description: 'Write or overwrite a file directly in the workspace filesystem and open it in the editor.',
-					parameters: {
-						type: 'object',
-						properties: {
-							path: { type: 'string', description: 'Relative file path (e.g. "api/main.py" or "portfolio.html")' },
-							content: { type: 'string', description: 'Complete source code or text content to write' }
-						},
-						required: ['path', 'content']
+		// 4. Tool Definitions based on Autonomy Level
+		const isReadOnly = this._autonomyLevel === 'L0' || this._autonomyLevel === 'L1';
+		const tools = isReadOnly
+			? []
+			: [
+				{
+					type: 'function',
+					function: {
+						name: 'write_file',
+						description: 'Write or overwrite a file directly in the workspace filesystem and open it in the editor.',
+						parameters: {
+							type: 'object',
+							properties: {
+								path: { type: 'string', description: 'Relative file path (e.g. "api/main.py" or "portfolio.html")' },
+								content: { type: 'string', description: 'Complete source code or text content to write' }
+							},
+							required: ['path', 'content']
+						}
+					}
+				},
+				{
+					type: 'function',
+					function: {
+						name: 'execute_command',
+						description: 'Execute a terminal or shell command in the workspace root directory (e.g. creating virtual environments, installing dependencies, creating directories).',
+						parameters: {
+							type: 'object',
+							properties: {
+								command: { type: 'string', description: 'Shell command to execute' }
+							},
+							required: ['command']
+						}
 					}
 				}
-			},
-			{
-				type: 'function',
-				function: {
-					name: 'execute_command',
-					description: 'Execute a terminal or shell command in the workspace root directory (e.g. creating virtual environments, installing dependencies, creating directories).',
-					parameters: {
-						type: 'object',
-						properties: {
-							command: { type: 'string', description: 'Shell command to execute' }
-						},
-						required: ['command']
-					}
-				}
-			}
-		];
+			];
 
-		const systemPrompt =
-			'You are CodeAlloy Agent, the autonomous AI engineering partner embedded directly in the CodeAlloy IDE.\n' +
-			'You have direct, full capability to forge files and execute terminal commands in the workspace using tools.\n\n' +
-			'STRICT OPERATING RULES:\n' +
-			'1. NEVER give tutorials, step-by-step numbered guides, or tell the user how to do something (e.g., NEVER say "Here is how you can...", "1. Create the folder: mkdir", "2. Run cd", etc.).\n' +
-			'2. YOU MUST EXECUTE ALL ACTIONS AUTONOMOUSLY using the available tools:\n' +
-			'   - Call execute_command to run terminal commands (creating folders, setting up virtual environments, installing dependencies).\n' +
-			'   - Call write_file to create or overwrite project files on disk.\n' +
-			'3. Continue invoking tools until all requested directories, environments, and files are created.\n' +
-			'4. When all actions are complete, conclude with a single concise confirmation sentence.\n' +
-			'5. Do not output conversational preamble before calling tools.';
+		let systemPrompt = '';
+		if (this._autonomyLevel === 'L0') {
+			systemPrompt =
+				'You are CodeAlloy Agent in Read-Only Assist Mode (L0).\n' +
+				'Provide code explanations, architectural analysis, or suggestions.\n' +
+				'You do not have access to tools and must NOT write files or execute commands on the system.';
+		} else if (this._autonomyLevel === 'L1') {
+			systemPrompt =
+				'You are CodeAlloy Agent in Interactive Chat Mode (L1).\n' +
+				'Collaborate as a coding partner. Answer questions and design solutions.\n' +
+				'You do not have access to tools and must NOT write files or execute commands on the system.';
+		} else if (this._autonomyLevel === 'L2') {
+			systemPrompt =
+				'You are CodeAlloy Agent in Supervised Mode (L2).\n' +
+				'You have access to tools (write_file, execute_command). Each action will be paused for user review and approval before execution on disk.\n' +
+				'Execute tasks cleanly using tools without giving conversational tutorials.';
+		} else if (this._autonomyLevel === 'L4') {
+			systemPrompt =
+				'You are CodeAlloy Agent in Autonomous Goal Mode (L4).\n' +
+				'You are assigned a self-contained engineering goal. Plan, execute tools, verify outcomes, and self-heal across multiple iterations until the goal is achieved.\n' +
+				'Continue invoking write_file and execute_command until all tasks and tests are satisfied, then provide a final confirmation.';
+		} else {
+			// L3 Guarded (Default)
+			systemPrompt =
+				'You are CodeAlloy Agent, the autonomous AI engineering partner embedded directly in the CodeAlloy IDE (Guarded Mode L3).\n' +
+				'You have direct capability to forge files and execute terminal commands in the workspace using tools.\n\n' +
+				'STRICT OPERATING RULES:\n' +
+				'1. NEVER give tutorials, step-by-step numbered guides, or tell the user how to do something (e.g., NEVER say "Here is how you can...", "1. Create the folder: mkdir", "2. Run cd", etc.).\n' +
+				'2. YOU MUST EXECUTE ALL ACTIONS AUTONOMOUSLY using the available tools:\n' +
+				'   - Call execute_command to run terminal commands (creating folders, setting up virtual environments, installing dependencies).\n' +
+				'   - Call write_file to create or overwrite project files on disk.\n' +
+				'3. Continue invoking tools until all requested directories, environments, and files are created.\n' +
+				'4. When all actions are complete, conclude with a single concise confirmation sentence.\n' +
+				'5. Do not output conversational preamble before calling tools.';
+		}
 
 		// 5. Multi-Turn Autonomous Agentic Execution Loop
-		const MAX_AGENTIC_TURNS = 6;
+		const MAX_AGENTIC_TURNS = this._autonomyLevel === 'L4' ? 25 : (isReadOnly ? 1 : 6);
 		let turnCount = 0;
+		let consecutiveErrors: string[] = [];
 		let conversationMessages: any[] = [
 			{ role: 'system', content: systemPrompt },
 			...this._messages
@@ -738,7 +870,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 
 		while (turnCount < MAX_AGENTIC_TURNS) {
 			turnCount++;
-			this._outputChannel.appendLine(`[AgentChat Loop] Turn ${turnCount}/${MAX_AGENTIC_TURNS} starting...`);
+			this._outputChannel.appendLine(`[AgentChat Loop] Turn ${turnCount}/${MAX_AGENTIC_TURNS} starting (mode: ${this._autonomyLevel})...`);
 
 			let turnContent = '';
 			const streamSuccess = await this._executeInferenceStream(
@@ -768,6 +900,11 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 				break;
 			}
 
+			// In read-only modes (L0/L1), stop after 1 conversational turn
+			if (isReadOnly) {
+				break;
+			}
+
 			// Parse tool actions
 			const actions = this._parseToolActions(turnContent);
 			this._outputChannel.appendLine(`[AgentChat Loop] Turn ${turnCount} yielded ${actions.length} action(s).`);
@@ -788,6 +925,7 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 			});
 
 			// Execute all tool actions sequentially
+			let circuitBreakerTripped = false;
 			for (const action of actions) {
 				if (action.name === 'execute_command' && action.arguments?.command) {
 					const cmd = action.arguments.command;
@@ -799,6 +937,28 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 							? `Command "${cmd}" executed successfully with exit code 0. Output:\n${res.output}`
 							: `Command "${cmd}" failed with error: ${res.output}`
 					});
+
+					// L4 Circuit Breaker: Error loop detector (US-2.4)
+					if (!res.success && this._autonomyLevel === 'L4') {
+						const errSig = (res.output || '').trim().toLowerCase().substring(0, 150);
+						consecutiveErrors.push(errSig);
+						const errLen = consecutiveErrors.length;
+						if (errLen >= 3 && consecutiveErrors[errLen - 1] === consecutiveErrors[errLen - 2] && consecutiveErrors[errLen - 2] === consecutiveErrors[errLen - 3]) {
+							this._outputChannel.appendLine(`[AgentChat Circuit Breaker] Tripped! Repeated error: ${errSig}`);
+							vscode.window.showErrorMessage(`CodeAlloy Circuit Breaker: Tripped on 3 identical consecutive errors. Halting autonomous loop.`);
+							if (this._view) {
+								this._view.webview.postMessage({
+									type: 'showNotice',
+									level: 'error',
+									message: '⚡ Circuit Breaker Tripped: The same error occurred 3 times in a row. Halting autonomous loop to prevent infinite churn.'
+								});
+							}
+							circuitBreakerTripped = true;
+							break;
+						}
+					} else if (res.success) {
+						consecutiveErrors = [];
+					}
 				} else if (action.name === 'write_file' && action.arguments?.path && action.arguments?.content) {
 					const ok = await this._executeFileAction(action.arguments.path, action.arguments.content, assistantMsgId);
 					conversationMessages.push({
@@ -809,6 +969,10 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 							: `Failed to write file "${action.arguments.path}".`
 					});
 				}
+			}
+
+			if (circuitBreakerTripped) {
+				break;
 			}
 		}
 
@@ -1378,6 +1542,115 @@ export class AgentChatViewProvider implements vscode.WebviewViewProvider {
 		.file-size {
 			color: var(--ca-text-muted) !important;
 			font-size: 10px;
+		}
+
+		/* Action Approval Card (L2 Supervised Mode) */
+		.action-approval-card {
+			margin-top: 10px;
+			margin-bottom: 6px;
+			background: rgba(217, 119, 6, 0.08);
+			border: 1px solid rgba(217, 119, 6, 0.35);
+			border-radius: 6px;
+			padding: 10px 12px;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+			animation: fadeIn 0.15s ease;
+		}
+
+		.action-approval-card.resolved {
+			opacity: 0.7;
+			pointer-events: none;
+		}
+
+		.approval-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			font-size: 11px;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+
+		.approval-type {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			color: var(--ca-gold);
+		}
+
+		.approval-target {
+			font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+			font-size: 12px;
+			color: #ECEFF4 !important;
+			font-weight: 600;
+			word-break: break-all;
+		}
+
+		.approval-details {
+			font-family: 'SF Mono', Monaco, Menlo, Consolas, monospace;
+			font-size: 11px;
+			color: var(--ca-text-muted);
+			background: var(--ca-code-bg);
+			padding: 6px 8px;
+			border-radius: 4px;
+			border: 1px solid var(--ca-border);
+			white-space: pre-wrap;
+			max-height: 120px;
+			overflow-y: auto;
+		}
+
+		.approval-actions {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-top: 4px;
+		}
+
+		.btn-approve {
+			background: #4EBD79;
+			color: #0E1013 !important;
+			border: none;
+			padding: 4px 10px;
+			border-radius: 4px;
+			font-size: 11px;
+			font-weight: 700;
+			cursor: pointer;
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			transition: background 0.15s ease, transform 0.1s ease;
+		}
+
+		.btn-approve:hover {
+			background: #62cf8d;
+			transform: translateY(-1px);
+		}
+
+		.btn-reject {
+			background: rgba(224, 108, 117, 0.15);
+			color: #E06C75 !important;
+			border: 1px solid rgba(224, 108, 117, 0.35);
+			padding: 4px 10px;
+			border-radius: 4px;
+			font-size: 11px;
+			font-weight: 600;
+			cursor: pointer;
+			display: inline-flex;
+			align-items: center;
+			gap: 4px;
+			transition: background 0.15s ease;
+		}
+
+		.btn-reject:hover {
+			background: rgba(224, 108, 117, 0.28);
+		}
+
+		.approval-hint {
+			font-size: 10px;
+			color: var(--ca-text-muted);
+			margin-left: auto;
 		}
 	</style>
 </head>

@@ -9,6 +9,7 @@ import { OllamaService, DiscoveredModel } from './ollamaService';
 
 let modelStatusBarItem: vscode.StatusBarItem;
 let chatStatusBarItem: vscode.StatusBarItem;
+let autonomyStatusBarItem: vscode.StatusBarItem;
 let modelManager: LocalModelManager;
 let llamaServer: LlamaServerService;
 let chatProvider: AgentChatViewProvider;
@@ -28,6 +29,14 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 	modelStatusBarItem.command = 'codealloy.selectModel';
 	context.subscriptions.push(modelStatusBarItem);
+
+	autonomyStatusBarItem = vscode.window.createStatusBarItem(
+		'codealloy.autonomySelector',
+		vscode.StatusBarAlignment.Right,
+		99
+	);
+	autonomyStatusBarItem.command = 'codealloy.selectAutonomy';
+	context.subscriptions.push(autonomyStatusBarItem);
 
 	chatStatusBarItem = vscode.window.createStatusBarItem(
 		'codealloy.chatButton',
@@ -50,7 +59,17 @@ export function activate(context: vscode.ExtensionContext) {
 		)
 	);
 
+	chatProvider.onDidChangeAutonomyLevel((level) => {
+		updateAutonomyStatusBar(level);
+	});
+
 	// 3. Register Commands
+	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.selectAutonomy', async () => {
+			await showAutonomyPicker();
+		})
+	);
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand('codealloy.selectModel', async () => {
 			await showModelPicker();
@@ -130,7 +149,9 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Initial status bar setup & auto-load active model
 	updateStatusBar();
+	updateAutonomyStatusBar(chatProvider.getAutonomyLevel());
 	modelStatusBarItem.show();
+	autonomyStatusBarItem.show();
 
 	const active = modelManager.getActiveModel();
 	if (active) {
@@ -289,6 +310,72 @@ function updateStatusBar(): void {
 		modelStatusBarItem.text = `$(flame) CodeAlloy: No Model`;
 		modelStatusBarItem.tooltip = 'Click to select or download a local coding model';
 		modelStatusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
+	}
+}
+
+function updateAutonomyStatusBar(level?: string): void {
+	const activeLevel = level || chatProvider.getAutonomyLevel() || 'L3';
+	const badges: Record<string, { icon: string; label: string; desc: string }> = {
+		L0: { icon: '$(info)', label: 'L0 Assist', desc: 'Read-only advisory mode (no file or terminal actions)' },
+		L1: { icon: '$(comment)', label: 'L1 Chat', desc: 'Interactive dialogue without autonomous tool execution' },
+		L2: { icon: '$(eye)', label: 'L2 Supv', desc: 'Supervised: 1-click approvals for all file writes and shell commands' },
+		L3: { icon: '$(shield)', label: 'L3 Guard', desc: 'Guarded: Auto-run safe workspace actions, guard dangerous commands (Default)' },
+		L4: { icon: '$(zap)', label: 'L4 Auto', desc: 'Autonomous: Goal runner loop with error circuit breaker' }
+	};
+	const info = badges[activeLevel] || badges['L3'];
+	autonomyStatusBarItem.text = `${info.icon} ${info.label}`;
+	autonomyStatusBarItem.tooltip = `CodeAlloy Autonomy Level: ${info.desc}\nClick to switch autonomy level`;
+	autonomyStatusBarItem.show();
+}
+
+async function showAutonomyPicker(): Promise<void> {
+	const current = chatProvider.getAutonomyLevel();
+	const items: (vscode.QuickPickItem & { level: string })[] = [
+		{
+			label: '$(info) L0: Assist',
+			description: 'Read-only advisory mode',
+			detail: 'Suggests code in chat; strictly prevents writing files or running terminal commands.',
+			picked: current === 'L0',
+			level: 'L0'
+		},
+		{
+			label: '$(comment) L1: Chat',
+			description: 'Interactive conversation',
+			detail: 'Conversational partner mode; answers questions without invoking autonomous tools.',
+			picked: current === 'L1',
+			level: 'L1'
+		},
+		{
+			label: '$(eye) L2: Supervised',
+			description: '1-click human approvals',
+			detail: 'Pauses before every file write and shell command for interactive Approve / Reject confirmation.',
+			picked: current === 'L2',
+			level: 'L2'
+		},
+		{
+			label: '$(shield) L3: Guarded (Recommended)',
+			description: 'Safe workspace auto-execution',
+			detail: 'Automatically creates/edits files and runs safe commands in workspace; intercepts dangerous operations.',
+			picked: current === 'L3',
+			level: 'L3'
+		},
+		{
+			label: '$(zap) L4: Autonomous',
+			description: 'Goal runner with circuit breaker',
+			detail: 'Iterates autonomously across up to 25 turns; halts automatically if 3 repeated errors occur.',
+			picked: current === 'L4',
+			level: 'L4'
+		}
+	];
+
+	const selected = await vscode.window.showQuickPick(items, {
+		placeHolder: 'Select CodeAlloy Autonomy Level'
+	});
+
+	if (selected) {
+		chatProvider.setAutonomyLevel(selected.level);
+		updateAutonomyStatusBar(selected.level);
+		vscode.window.showInformationMessage(`CodeAlloy: Switched to Autonomy Level ${selected.label.replace(/\$\([^)]+\)\s*/, '')}.`);
 	}
 }
 

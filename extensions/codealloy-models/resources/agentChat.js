@@ -52,6 +52,51 @@
 		executeSend(promptText);
 	};
 
+	window.approveAction = function(actionId) {
+		const card = document.getElementById('approval-' + actionId);
+		if (card) {
+			card.classList.add('resolved');
+			card.classList.remove('active-approval');
+			const actionsEl = card.querySelector('.approval-actions');
+			if (actionsEl) {
+				actionsEl.innerHTML = '<span style="color: #4EBD79; font-weight: 600; font-size: 11px;">✓ Action Approved</span>';
+			}
+		}
+		vscode.postMessage({ type: 'actionApproved', actionId: actionId });
+	};
+
+	window.rejectAction = function(actionId) {
+		const card = document.getElementById('approval-' + actionId);
+		if (card) {
+			card.classList.add('resolved');
+			card.classList.remove('active-approval');
+			const actionsEl = card.querySelector('.approval-actions');
+			if (actionsEl) {
+				actionsEl.innerHTML = '<span style="color: #E06C75; font-weight: 600; font-size: 11px;">✗ Action Rejected</span>';
+			}
+		}
+		vscode.postMessage({ type: 'actionRejected', actionId: actionId, reason: 'Rejected by user in L2 Supervised mode' });
+	};
+
+	// Keyboard shortcut handling: Enter to Approve, Esc to Reject active L2 card
+	document.addEventListener('keydown', function(e) {
+		const activeCard = document.querySelector('.action-approval-card.active-approval:not(.resolved)');
+		if (!activeCard) return;
+
+		const actionId = activeCard.getAttribute('data-action-id');
+		if (!actionId) return;
+
+		if (e.key === 'Escape') {
+			e.preventDefault();
+			e.stopPropagation();
+			window.rejectAction(actionId);
+		} else if (e.key === 'Enter' && document.activeElement !== promptInput) {
+			e.preventDefault();
+			e.stopPropagation();
+			window.approveAction(actionId);
+		}
+	});
+
 	if (modelBadgeEl) {
 		modelBadgeEl.addEventListener('click', function() {
 			window.triggerSelectModel();
@@ -498,6 +543,37 @@
 					}
 				}
 				endStreamUI();
+				break;
+			}
+
+			case 'actionApprovalRequired': {
+				const asstDiv = document.getElementById(message.assistantMsgId) ||
+				                pendingAssistantTurnEl ||
+				                messagesContainer.querySelector('.message-bubble.assistant:last-child');
+				if (asstDiv) {
+					const card = document.createElement('div');
+					card.className = 'action-approval-card active-approval';
+					card.id = 'approval-' + message.actionId;
+					card.setAttribute('data-action-id', message.actionId);
+
+					const typeLabel = message.actionType === 'file' ? 'Write File' : 'Run Shell Command';
+					const typeIcon = message.actionType === 'file' ? '📄' : '⚡';
+
+					card.innerHTML =
+						'<div class="approval-header">' +
+							'<span class="approval-type"><span class="approval-icon">' + typeIcon + '</span> L2 Approval Required: ' + escapeHtml(typeLabel) + '</span>' +
+						'</div>' +
+						'<div class="approval-target">' + escapeHtml(message.target) + '</div>' +
+						(message.details ? '<div class="approval-details">' + escapeHtml(message.details) + '</div>' : '') +
+						'<div class="approval-actions">' +
+							'<button class="btn-approve" onclick="window.approveAction(\'' + escapeHtml(message.actionId) + '\')">Approve (Enter)</button>' +
+							'<button class="btn-reject" onclick="window.rejectAction(\'' + escapeHtml(message.actionId) + '\')">Reject (Esc)</button>' +
+							'<span class="approval-hint">Enter to allow &bull; Esc to block</span>' +
+						'</div>';
+
+					asstDiv.appendChild(card);
+					messagesContainer.scrollTop = messagesContainer.scrollHeight;
+				}
 				break;
 			}
 

@@ -95,28 +95,28 @@ CodeAlloy embeds a native `llama.cpp` C++ engine directly inside the app bundle 
 
 ---
 
-## Epic 2: Autonomy Levels & Permissions Guardrails
+## Epic 2: Autonomy Levels & Permissions Guardrails `[COMPLETED]`
 
-### US-2.1: The Persistent Autonomy Dial
+### US-2.1: The Persistent Autonomy Dial `[COMPLETED]`
 * **User Story**: As a developer, I want a visible autonomy selector in the agent sidebar and status bar, so that I can instantly switch between Assisted, Supervised, Guarded, and Full Autonomous modes with a single click.
 * **Acceptance Criteria**:
   * **AC 2.1.1**: A segmented control with 5 levels (`L0: Assist`, `L1: Chat`, `L2: Supervised`, `L3: Guarded`, `L4: Autonomous`) is displayed at the top of the agent panel and in the bottom status bar.
   * **AC 2.1.2**: Switching levels updates the active session instantly without restarting the agent or clearing conversation context.
 
-### US-2.2: Level 2 (Supervised) 1-Click Action Confirmations
+### US-2.2: Level 2 (Supervised) 1-Click Action Confirmations `[COMPLETED]`
 * **User Story**: As a developer working on sensitive production code, I want the agent in Level 2 to present every proposed file write and terminal command for approval, so that I can review each change before disk modification.
 * **Acceptance Criteria**:
   * **AC 2.2.1**: When the agent decides to invoke `write_to_file`, `replace_file_content`, or `run_command`, the execution pauses.
   * **AC 2.2.2**: The agent panel displays an interactive confirmation card with a side-by-side diff (for files) or command preview (for shell).
   * **AC 2.2.3**: Clicking **[Approve]** (`Enter`) executes the tool; clicking **[Reject]** (`Esc`) cancels the action and sends the user's rejection reason back to the agent.
 
-### US-2.3: Level 3 (Guarded) Safe Workspace Auto-Execution
+### US-2.3: Level 3 (Guarded) Safe Workspace Auto-Execution `[COMPLETED]`
 * **User Story**: As a developer developing a new feature, I want the agent to automatically write files and run safe commands within the workspace root without nagging me, but pause for dangerous operations, so that I can work fast with safety.
 * **Acceptance Criteria**:
   * **AC 2.3.1**: File edits and reads within the workspace folder execute automatically without pausing.
   * **AC 2.3.2**: Commands matching a configurable dangerous blacklist (`rm -rf`, `sudo`, `git push --force`, `curl | bash`, or accessing paths outside workspace) trigger an explicit approval dialog.
 
-### US-2.4: Level 4 (Autonomous) Goal Runner Loop
+### US-2.4: Level 4 (Autonomous) Goal Runner Loop `[COMPLETED]`
 * **User Story**: As a developer, I want to assign a high-level goal to the agent (e.g., "Build unit tests for the auth module until 100% pass") and let it iterate autonomously with circuit breakers, so that I can delegate self-contained engineering tasks.
 * **Acceptance Criteria**:
   * **AC 2.4.1**: The agent loops through: Plan $\to$ Edit $\to$ Run Test $\to$ Inspect Error $\to$ Self-Heal without human intervention.

@@ -47,3 +47,5 @@ coverage/
 logs/
 *.log
 scratch/
+api/
+venv/
