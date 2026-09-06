@@ -122,7 +122,7 @@ LLAMA_URL=""
 LLAMA_ARCHIVE_TYPE="tar"
 
 OS_NAME="$(uname -s | tr '[:upper:]' '[:lower:]')"
-ARCH_NAME="$(uname -m)"
+ARCH_NAME="${TARGET_ARCH:-$(uname -m)}"
 
 if [ "${OS_NAME}" = "darwin" ]; then
     if [ "${ARCH_NAME}" = "arm64" ]; then

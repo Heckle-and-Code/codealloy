@@ -1,6 +1,6 @@
 # What's New in CodeAlloy
 
-### Latest Release: v0.1.0-alpha.4
+### Latest Release: v0.1.0-alpha.5
 
 Welcome to the initial developer preview of CodeAlloy! Here are the latest updates and additions:
 

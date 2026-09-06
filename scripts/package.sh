@@ -65,8 +65,8 @@ npm run gulp transpile-client-esbuild transpile-extensions
 UNAME_OUT="$(uname -s)"
 case "${UNAME_OUT}" in
     Darwin*)
-        ARCH="$(uname -m)"
-        if [ "${ARCH}" = "arm64" ]; then
+        TARGET_ARCH="${TARGET_ARCH:-$(uname -m)}"
+        if [ "${TARGET_ARCH}" = "arm64" ] || [ "${TARGET_ARCH}" = "aarch64" ]; then
             TARGET="vscode-darwin-arm64"
             OUT_NAME="CodeAlloy-v${VERSION}-darwin-arm64"
             BUILD_FOLDER="VSCode-darwin-arm64"

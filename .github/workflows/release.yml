@@ -83,11 +83,17 @@ jobs:
 
       - name: Bootstrap CodeAlloy Base
         shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.target.arch }}
+          npm_config_arch: ${{ matrix.target.arch }}
         run: |
           bash ./scripts/bootstrap.sh
 
       - name: Package CodeAlloy (${{ matrix.target.os }}-${{ matrix.target.arch }})
         shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.target.arch }}
+          npm_config_arch: ${{ matrix.target.arch }}
         run: |
           bash ./scripts/package.sh
 
@@ -95,14 +101,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          # Move distribution packages from outside dist into dist
-          find . -maxdepth 3 \( -name "CodeAlloy-*" -o -name "codealloy_*" \) | while read -r f; do
-            if [[ "$f" != "./dist/"* ]] && [[ "$f" != "dist/"* ]]; then
-              if [ -f "$f" ]; then
-                cp "$f" dist/
-              elif [ -d "$f" ] && [[ "$f" == *.app ]]; then
-                zip -r "dist/${{ matrix.target.pkg_name }}.zip" "$f"
-              fi
+          # Copy any packaged release archives outside dist if present
+          find . -maxdepth 3 \( -name "CodeAlloy-*.zip" -o -name "CodeAlloy-*.dmg" -o -name "CodeAlloy-*.tar.gz" \) | while read -r f; do
+            if [[ "$f" != "./dist/"* ]] && [[ "$f" != "dist/"* ]] && [ -f "$f" ]; then
+              cp "$f" dist/
             fi
           done
           

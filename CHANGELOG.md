@@ -5,6 +5,14 @@ All notable changes to the **CodeAlloy** project will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.5] - 2026-09-06
+
+### Fixed
+- **Multi-Architecture Release Collisions**: Fixed runner architecture detection in `scripts/package.sh` and `scripts/bootstrap.sh` by respecting `$TARGET_ARCH` from CI matrices. Previously, both `darwin-arm64` and `darwin-x64` matrix jobs running on `macos-14` runners built with identical filenames (`CodeAlloy-*-darwin-arm64.dmg`), causing file collisions and truncation/corruption during release asset aggregation (`actions/download-artifact`).
+- **macOS "App Not Supported" Error**: Resolved the corrupt Mach-O / DMG I/O error (`Unknown error: 1000`) that caused macOS LaunchServices to display the "Application not supported on this Mac" error with a circle-slash symbol over the app icon.
+
+---
+
 ## [0.1.0-alpha.4] - 2026-09-06
 
 ### Added
