@@ -12,9 +12,6 @@
     "strict": false,
     "noImplicitAny": false,
     "moduleResolution": "node",
-    "typeRoots": [
-      "../../.build/code-oss/node_modules/@types"
-    ],
     "skipLibCheck": true
   },
   "include": [

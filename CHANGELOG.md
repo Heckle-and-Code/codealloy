@@ -5,6 +5,13 @@ All notable changes to the **CodeAlloy** project will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.6] - 2026-09-06
+
+### Fixed
+- **Windows Core Extension TypeScript Compilation**: Resolved missing Node type definitions (`Cannot find module 'http'`, `Cannot find name 'process'`) on Windows builders by adding `@types/node` and `@types/vscode` directly to `extensions/codealloy-models/package.json` and removing fragile cross-directory `typeRoots` in `tsconfig.json`.
+
+---
+
 ## [0.1.0-alpha.5] - 2026-09-06
 
 ### Fixed

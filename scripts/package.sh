@@ -47,7 +47,10 @@ node -e "
 " 2>/dev/null || true
 
 echo "  ⚡ Compiling CodeAlloy core extension (codealloy-models)..."
-(cd "${ROOT_DIR}" && "${UPSTREAM_DIR}/node_modules/typescript/bin/tsc" -p extensions/codealloy-models/tsconfig.json 2>/dev/null || true)
+if [ ! -d "${ROOT_DIR}/extensions/codealloy-models/node_modules" ]; then
+    (cd "${ROOT_DIR}/extensions/codealloy-models" && npm install --no-audit --no-fund)
+fi
+(cd "${ROOT_DIR}/extensions/codealloy-models" && npm run compile)
 
 echo "  ⚡ Staging codealloy-models into Code-OSS extensions..."
 rm -rf "${UPSTREAM_DIR}/extensions/codealloy-models"

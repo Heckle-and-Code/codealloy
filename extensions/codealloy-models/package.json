@@ -208,5 +208,10 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.0",
+    "@types/vscode": "^1.96.0",
+    "typescript": "^5.7.2"
   }
 }

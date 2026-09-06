@@ -194,8 +194,8 @@ echo ""
 echo "🧩 Linking & compiling CodeAlloy core extensions (codealloy-models)..."
 mkdir -p "${BUILD_CACHE_DIR}/extensions"
 rm -rf "${BUILD_CACHE_DIR}/extensions/codealloy-models"
-ln -sfn "${ROOT_DIR}/extensions/codealloy-models" "${BUILD_CACHE_DIR}/extensions/codealloy-models"
-(cd "${ROOT_DIR}" && "${BUILD_CACHE_DIR}/node_modules/typescript/bin/tsc" -p extensions/codealloy-models/tsconfig.json 2>/dev/null || true)
+ln -sfn "${ROOT_DIR}/extensions/codealloy-models" "${BUILD_CACHE_DIR}/extensions/codealloy-models" 2>/dev/null || cp -R "${ROOT_DIR}/extensions/codealloy-models" "${BUILD_CACHE_DIR}/extensions/"
+(cd "${ROOT_DIR}/extensions/codealloy-models" && npm install --no-audit --no-fund && npm run compile)
 
 # 7. Compiling the CodeAlloy Shell
 echo ""
