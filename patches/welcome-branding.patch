@@ -1,8 +1,25 @@
 diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
-index cb25dc9..bde8d33 100644
+index cb25dc9..b651b2b 100644
 --- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
 +++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
-@@ -831,7 +831,7 @@ export class GettingStartedPage extends EditorPane {
+@@ -45,7 +45,7 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+ import { IProductService } from '../../../../platform/product/common/productService.js';
+ import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
+ import { IStorageService, StorageScope, StorageTarget, WillSaveStateReason } from '../../../../platform/storage/common/storage.js';
+-import { ITelemetryService, TelemetryLevel, firstSessionDateStorageKey } from '../../../../platform/telemetry/common/telemetry.js';
++import { ITelemetryService, TelemetryLevel } from '../../../../platform/telemetry/common/telemetry.js';
+ import { getTelemetryLevel } from '../../../../platform/telemetry/common/telemetryUtils.js';
+ import { defaultButtonStyles, defaultKeybindingLabelStyles, defaultToggleStyles } from '../../../../platform/theme/browser/defaultStyles.js';
+ import { IWindowOpenable } from '../../../../platform/window/common/window.js';
+@@ -147,7 +147,6 @@ export class GettingStartedPage extends EditorPane {
+ 
+ 	private contextService: IContextKeyService;
+ 
+-	private hasScrolledToFirstCategory = false;
+ 	private recentlyOpenedList?: GettingStartedIndexList<RecentEntry>;
+ 	private startList?: GettingStartedIndexList<IWelcomePageStartEntry>;
+ 	private gettingStartedList?: GettingStartedIndexList<IResolvedWalkthrough>;
+@@ -831,7 +830,7 @@ export class GettingStartedPage extends EditorPane {
  
  		const header = $('.header', {},
  			$('h1.product-name.caption', {}, this.productService.nameLong),
@@ -11,7 +28,12 @@ index cb25dc9..bde8d33 100644
  		);
  
  		const leftColumn = $('.categories-column.categories-column-left', {},);
-@@ -904,12 +904,8 @@ export class GettingStartedPage extends EditorPane {
+@@ -899,20 +898,14 @@ export class GettingStartedPage extends EditorPane {
+ 			}
+ 		}
+ 
+-		const someStepsComplete = this.gettingStartedCategories.some(category => category.steps.find(s => s.done));
+ 		if (this.editorInput.showTelemetryNotice && this.productService.openToWelcomeMainPage) {
  			const telemetryNotice = $('p.telemetry-notice');
  			this.buildTelemetryFooter(telemetryNotice);
  			footer.appendChild(telemetryNotice);
@@ -25,7 +47,10 @@ index cb25dc9..bde8d33 100644
 +			if (true) {
  				const first = this.gettingStartedCategories.filter(c => !c.when || this.contextService.contextMatchesRules(c.when))[0];
  				if (first) {
- 					this.hasScrolledToFirstCategory = true;
+-					this.hasScrolledToFirstCategory = true;
+ 					this.currentWalkthrough = first;
+ 					this.editorInput.selectedCategory = this.currentWalkthrough?.id;
+ 					this.editorInput.walkthroughPageTitle = this.currentWalkthrough.walkthroughPageTitle;
 diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
 index 303905c..9cb6655 100644
 --- a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
