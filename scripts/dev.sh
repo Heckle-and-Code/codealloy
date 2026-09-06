@@ -24,7 +24,11 @@ cp "${ROOT_DIR}/build/product.json" "${UPSTREAM_DIR}/product.json"
 
 echo "⚡ Syncing CodeAlloy built-in extensions..."
 mkdir -p "${UPSTREAM_DIR}/extensions"
+rm -rf "${UPSTREAM_DIR}/extensions/codealloy-models"
 ln -sfn "${ROOT_DIR}/extensions/codealloy-models" "${UPSTREAM_DIR}/extensions/codealloy-models"
+mkdir -p "${UPSTREAM_DIR}/.build/extensions"
+rm -rf "${UPSTREAM_DIR}/.build/extensions/codealloy-models"
+ln -sfn "${ROOT_DIR}/extensions/codealloy-models" "${UPSTREAM_DIR}/.build/extensions/codealloy-models"
 (cd "${ROOT_DIR}" && "${UPSTREAM_DIR}/node_modules/typescript/bin/tsc" -p extensions/codealloy-models/tsconfig.json 2>/dev/null || true)
 
 

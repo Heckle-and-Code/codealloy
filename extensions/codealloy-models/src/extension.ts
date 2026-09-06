@@ -109,6 +109,16 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand('codealloy.openWelcome', async () => {
+			try {
+				await vscode.commands.executeCommand('workbench.action.openWalkthrough', 'codealloy.codealloy-models#codealloy.welcome');
+			} catch (e) {
+				console.error('[CodeAlloy] Failed to open walkthrough:', e);
+			}
+		})
+	);
+
+	context.subscriptions.push(
 		vscode.commands.registerCommand('codealloy.selectModel', async () => {
 			await showModelPicker();
 		})

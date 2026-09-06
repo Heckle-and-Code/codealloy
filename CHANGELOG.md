@@ -5,6 +5,20 @@ All notable changes to the **CodeAlloy** project will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.4] - 2026-09-06
+
+### Added
+- **Dedicated CodeAlloy Welcome Experience**: Completely replaced upstream VS Code welcome walkthroughs with a native CodeAlloy onboarding experience featuring:
+  - **What is CodeAlloy**: Sovereign, 100% private, zero-telemetry architecture with built-in `llama.cpp` inference and Apple Silicon Metal acceleration.
+  - **Getting & Connecting a Model**: 1-click curated GGUF model downloads (`Qwen 2.5 Coder 7B/1.5B/14B`, `DeepSeek R1 Distill 7B`), local GGUF file loader from disk, and external Ollama / vLLM connection guides.
+  - **5-Tier Autonomy Dial & Shadow Git**: Guided overview of autonomy levels (L0-L4) and sub-5ms isolated worktree checkpoints with 1-click turn rollbacks.
+  - **Quick Project Entrypoints**: Direct `[Open Recent Folder...]` and `[Pick a Folder...]` buttons directly on the welcome screen.
+  - **Latest Changelog Highlights**: In-editor release notes and GitHub issue/feedback links.
+
+### Fixed
+- **Instant Welcome Screen Launch**: Fixed a momentary flash of the generic VS Code index page on launch by removing session date barriers and mounting directly to the CodeAlloy walkthrough at `t=0ms`.
+- **Eliminated Upstream Artifacts**: Removed broken Microsoft video tutorial links, Copilot setup placeholders, and empty language extension listings from the welcome workflow.
+
 ---
 
 ## [0.1.0-alpha.3] - 2026-09-05

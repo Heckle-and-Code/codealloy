@@ -18,6 +18,11 @@
   "contributes": {
     "commands": [
       {
+        "command": "codealloy.openWelcome",
+        "title": "CodeAlloy: Welcome Walkthrough",
+        "category": "CodeAlloy"
+      },
+      {
         "command": "codealloy.selectModel",
         "title": "CodeAlloy: Select Active Model",
         "category": "CodeAlloy"
@@ -116,6 +121,51 @@
         }
       ]
     },
+    "walkthroughs": [
+      {
+        "id": "codealloy.welcome",
+        "title": "Welcome to CodeAlloy",
+        "icon": "resources/anvil-flame.svg",
+        "description": "Where developer intent meets open models. Learn how to connect local models and use autonomous coding features.",
+        "featuredFor": [
+          "*"
+        ],
+        "steps": [
+          {
+            "id": "codealloy.about",
+            "title": "What is CodeAlloy?",
+            "description": "Discover how CodeAlloy brings sovereign, private AI pair programming to local models with zero telemetry.",
+            "media": {
+              "markdown": "resources/walkthrough/about.md"
+            }
+          },
+          {
+            "id": "codealloy.getModels",
+            "title": "Getting & Connecting a Model",
+            "description": "Run models natively with built-in llama.cpp (Metal GPU), download curated models, or connect external Ollama / vLLM servers.",
+            "media": {
+              "markdown": "resources/walkthrough/models.md"
+            }
+          },
+          {
+            "id": "codealloy.autonomy",
+            "title": "The 5-Tier Autonomy Dial",
+            "description": "Take full control of agent authority, from passive assistance to supervised diff approvals and autonomous goal loops.",
+            "media": {
+              "markdown": "resources/walkthrough/autonomy.md"
+            }
+          },
+          {
+            "id": "codealloy.changelog",
+            "title": "Latest Changelog (v0.1.0-alpha.3)",
+            "description": "Explore what's new in the latest release of CodeAlloy.",
+            "media": {
+              "markdown": "resources/walkthrough/changelog.md"
+            }
+          }
+        ]
+      }
+    ],
     "configuration": {
       "title": "CodeAlloy Models",
       "properties": {

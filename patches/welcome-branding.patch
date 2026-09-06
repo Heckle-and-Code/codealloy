@@ -1,5 +1,5 @@
 diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
-index cb25dc9..61491c8 100644
+index cb25dc9..bde8d33 100644
 --- a/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
 +++ b/src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStarted.ts
 @@ -831,7 +831,7 @@ export class GettingStartedPage extends EditorPane {
@@ -11,8 +11,23 @@ index cb25dc9..61491c8 100644
  		);
  
  		const leftColumn = $('.categories-column.categories-column-left', {},);
+@@ -904,12 +904,8 @@ export class GettingStartedPage extends EditorPane {
+ 			const telemetryNotice = $('p.telemetry-notice');
+ 			this.buildTelemetryFooter(telemetryNotice);
+ 			footer.appendChild(telemetryNotice);
+-		} else if (!this.productService.openToWelcomeMainPage && !someStepsComplete && !this.hasScrolledToFirstCategory && this.showFeaturedWalkthrough) {
+-			const firstSessionDateString = this.storageService.get(firstSessionDateStorageKey, StorageScope.APPLICATION) || new Date().toUTCString();
+-			const daysSinceFirstSession = ((+new Date()) - (+new Date(firstSessionDateString))) / 1000 / 60 / 60 / 24;
+-			const fistContentBehaviour = daysSinceFirstSession < 1 ? 'openToFirstCategory' : 'index';
+-
+-			if (fistContentBehaviour === 'openToFirstCategory') {
++		} else if (!this.productService.openToWelcomeMainPage) {
++			if (true) {
+ 				const first = this.gettingStartedCategories.filter(c => !c.when || this.contextService.contextMatchesRules(c.when))[0];
+ 				if (first) {
+ 					this.hasScrolledToFirstCategory = true;
 diff --git a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
-index 303905c..3af976e 100644
+index 303905c..9cb6655 100644
 --- a/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
 +++ b/src/vs/workbench/contrib/welcomeGettingStarted/common/gettingStartedContent.ts
 @@ -12,7 +12,6 @@ import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js'
@@ -23,7 +38,7 @@ index 303905c..3af976e 100644
  
  interface IGettingStartedContentProvider {
  	(): string;
-@@ -210,45 +209,32 @@ export const startEntries: GettingStartedStartEntryContent = [
+@@ -210,140 +209,71 @@ export const startEntries: GettingStartedStartEntryContent = [
  
  const Button = (title: string, href: string) => `[${title}](${href})`;
  
@@ -68,16 +83,133 @@ index 303905c..3af976e 100644
 -				createCopilotSetupStep('CopilotSetupSignedOut', CopilotSignedOutButton, 'config.chat.experimental.offerSetup && chatSetupSignedOut', true),
 -				createCopilotSetupStep('CopilotSetupComplete', CopilotCompleteButton, 'config.chat.experimental.offerSetup && chatSetupInstalled && (chatSetupEntitled || chatSetupLimited)', false),
 -				createCopilotSetupStep('CopilotSetupSignedIn', CopilotSignedInButton, 'config.chat.experimental.offerSetup && !chatSetupSignedOut && (!chatSetupInstalled || chatSetupCanSignUp)', true),
-+				{
-+					id: 'openModelsSetup',
-+					title: localize('gettingStarted.openModels.title', "Forge code with Open Models"),
-+					description: localize('gettingStarted.openModels.description', "Connect CodeAlloy to Ollama, vLLM, or LM Studio for 100% private, local model execution with zero cloud lock-in.\n\n[Open Model Settings](command:workbench.action.openSettings)"),
-+					media: {
+-				{
+-					id: 'pickColorTheme',
+-					title: localize('gettingStarted.pickColor.title', "Choose your theme"),
+-					description: localize('gettingStarted.pickColor.description.interpolated', "The right theme helps you focus on your code, is easy on your eyes, and is simply more fun to use.\n{0}", Button(localize('titleID', "Browse Color Themes"), 'command:workbench.action.selectTheme')),
+-					completionEvents: [
+-						'onSettingChanged:workbench.colorTheme',
+-						'onCommand:workbench.action.selectTheme'
+-					],
+-					media: { type: 'markdown', path: 'theme_picker', }
+-				},
+-				{
+-					id: 'extensionsWeb',
+-					title: localize('gettingStarted.extensions.title', "Code with extensions"),
+-					description: localize('gettingStarted.extensionsWeb.description.interpolated', "Extensions are VS Code's power-ups. A growing number are becoming available in the web.\n{0}", Button(localize('browsePopularWeb', "Browse Popular Web Extensions"), 'command:workbench.extensions.action.showPopularExtensions')),
+-					when: 'workspacePlatform == \'webworker\'',
+-					media: {
+-						type: 'svg', altText: 'VS Code extension marketplace with featured language extensions', path: 'extensions-web.svg'
+-					},
+-				},
+-				{
+-					id: 'findLanguageExtensions',
+-					title: localize('gettingStarted.findLanguageExts.title', "Rich support for all your languages"),
+-					description: localize('gettingStarted.findLanguageExts.description.interpolated', "Code smarter with syntax highlighting, code completion, linting and debugging. While many languages are built-in, many more can be added as extensions.\n{0}", Button(localize('browseLangExts', "Browse Language Extensions"), 'command:workbench.extensions.action.showLanguageExtensions')),
+-					when: 'workspacePlatform != \'webworker\'',
+-					media: {
+-						type: 'svg', altText: 'Language extensions', path: 'languages.svg'
+-					},
+-				},
+ 				{
+-					id: 'settings',
+-					title: localize('gettingStarted.settings.title', "Tune your settings"),
+-					description: localize('gettingStarted.settings.description.interpolated', "Customize every aspect of VS Code and your extensions to your liking. Commonly used settings are listed first to get you started.\n{0}", Button(localize('tweakSettings', "Open Settings"), 'command:toSide:workbench.action.openSettings')),
+-					when: '!config.chat.experimental.offerSetup',
++					id: 'codealloyAbout',
++					title: localize('gettingStarted.codealloyAbout.title', "What is CodeAlloy?"),
++					description: localize('gettingStarted.codealloyAbout.description', "CodeAlloy is a sovereign, open-source AI code editor built from the ground up for developers who want Cursor-like autonomy powered entirely by local or self-hosted open-weights models.\n\n• **Built-in Inference Engine**: Native llama.cpp with Apple Silicon Metal acceleration embedded directly into the editor. Download and run GGUF models with zero external installations.\n• **100% Private & Sovereign**: Zero code telemetry, zero cloud lock-in. Your code and prompts never leave your local machine.\n• **5-Tier Autonomy Dial**: Full developer control from passive assistance (L0) to supervised diff approval (L2) and guarded autonomous project edits (L3/L4).\n• **Shadow Git Checkpoints**: Sub-5ms isolated worktree snapshots before every agent turn, with 1-click turn rollbacks to effortlessly reverse mistakes.\n\n[Open Forge Agent](command:codealloy.focusChat)\n\n[Select Active Model](command:codealloy.selectModel)"),
+ 					media: {
+-						type: 'svg', altText: 'VS Code Settings', path: 'settings.svg'
+-					},
+-				},
+-				{
+-					id: 'settingsSync',
+-					title: localize('gettingStarted.settingsSync.title', "Sync settings across devices"),
+-					description: localize('gettingStarted.settingsSync.description.interpolated', "Keep your essential customizations backed up and updated across all your devices.\n{0}", Button(localize('enableSync', "Backup and Sync Settings"), 'command:workbench.userDataSync.actions.turnOn')),
+-					when: '!config.chat.experimental.offerSetup && syncStatus != uninitialized',
+-					completionEvents: ['onEvent:sync-enabled'],
+-					media: {
+-						type: 'svg', altText: 'The "Turn on Sync" entry in the settings gear menu.', path: 'settingsSync.svg'
+-					},
 +						type: 'svg',
-+						altText: 'CodeAlloy Open Models',
++						altText: 'CodeAlloy Architecture',
 +						path: 'languages.svg'
 +					}
-+				},
+ 				},
  				{
- 					id: 'pickColorTheme',
- 					title: localize('gettingStarted.pickColor.title', "Choose your theme"),
+-					id: 'settingsAndSync',
+-					title: localize('gettingStarted.settings.title', "Tune your settings"),
+-					description: localize('gettingStarted.settingsAndSync.description.interpolated', "Customize every aspect of VS Code and your extensions to your liking. [Back up and sync](command:workbench.userDataSync.actions.turnOn) your essential customizations across all your devices.\n{0}", Button(localize('tweakSettings', "Open Settings"), 'command:toSide:workbench.action.openSettings')),
+-					when: 'config.chat.experimental.offerSetup && syncStatus != uninitialized',
+-					completionEvents: ['onEvent:sync-enabled'],
++					id: 'codealloyModels',
++					title: localize('gettingStarted.codealloyModels.title', "Getting & Connecting a Model"),
++					description: localize('gettingStarted.codealloyModels.description', "CodeAlloy runs open-weights coding models completely locally with **built-in llama.cpp and Apple Silicon Metal GPU acceleration**—no third-party apps, subscription fees, or cloud dependencies required.\n\n• **Option 1: 1-Click Curated Models (Zero Setup)**\nDownload pre-configured coding models like **Qwen 2.5 Coder 7B (Recommended)**, **Qwen 2.5 Coder 1.5B (Fast)**, **DeepSeek R1 Distill 7B**, or **Qwen 2.5 Coder 14B** directly inside CodeAlloy.\n\n• **Option 2: Bring Your Own GGUF File**\nPoint CodeAlloy directly to any `.gguf` file on your disk.\n\n• **Option 3: External Ollama or vLLM**\nAuto-detects running Ollama instances on `http://localhost:11434` or custom vLLM / LM Studio endpoints.\n\n[Select Active Model (Ollama / Metal)](command:codealloy.selectModel)\n\n[Add GGUF Model from Disk](command:codealloy.addLocalModel)\n\n[Download Ollama](https://ollama.com)"),
+ 					media: {
+-						type: 'svg', altText: 'VS Code Settings', path: 'settings.svg'
+-					},
+-				},
+-				{
+-					id: 'commandPaletteTask',
+-					title: localize('gettingStarted.commandPalette.title', "Unlock productivity with the Command Palette "),
+-					description: localize('gettingStarted.commandPalette.description.interpolated', "Run commands without reaching for your mouse to accomplish any task in VS Code.\n{0}", Button(localize('commandPalette', "Open Command Palette"), 'command:workbench.action.showCommands')),
+-					media: { type: 'svg', altText: 'Command Palette overlay for searching and executing commands.', path: 'commandPalette.svg' },
++						type: 'svg',
++						altText: 'CodeAlloy Model Setup',
++						path: 'settings.svg'
++					}
+ 				},
+ 				{
+-					id: 'pickAFolderTask-Mac',
+-					title: localize('gettingStarted.setup.OpenFolder.title', "Open up your code"),
+-					description: localize('gettingStarted.setup.OpenFolder.description.interpolated', "You're all set to start coding. Open a project folder to get your files into VS Code.\n{0}", Button(localize('pickFolder', "Pick a Folder"), 'command:workbench.action.files.openFileFolder')),
+-					when: '!config.chat.experimental.offerSetup && isMac && workspaceFolderCount == 0',
++					id: 'codealloyAutonomy',
++					title: localize('gettingStarted.codealloyAutonomy.title', "The 5-Tier Autonomy Dial & Shadow Git"),
++					description: localize('gettingStarted.codealloyAutonomy.description', "You should always be in full control of your AI assistant. CodeAlloy features a 5-tier autonomy dial in the Agent panel and bottom status bar:\n\n• **L0: Assist** — Passive autocomplete & ghost text.\n• **L1: Chat** — Interactive sidebar Q&A and architecture discussions. Zero disk writes.\n• **L2: Supervised (Default)** — Interactive approvals with side-by-side diff previews before every file write.\n• **L3: Guarded** — Autonomous multi-file project edits within workspace boundaries.\n• **L4: Autonomous** — Continuous goal runner with built-in loop detection circuit breakers.\n\n• **Shadow Git Safety Net**: Every turn is snapshotted in under 5ms. Click **Undo Turn** to effortlessly restore your workspace instantly.\n\n[Select Autonomy Level](command:codealloy.selectAutonomy)\n\n[Open Forge Agent](command:codealloy.focusChat)"),
+ 					media: {
+-						type: 'svg', altText: 'Explorer view showing buttons for opening folder and cloning repository.', path: 'openFolder.svg'
++						type: 'svg',
++						altText: 'CodeAlloy Autonomy Dial',
++						path: 'commandPalette.svg'
+ 					}
+ 				},
+ 				{
+-					id: 'pickAFolderTask-Other',
+-					title: localize('gettingStarted.setup.OpenFolder.title', "Open up your code"),
+-					description: localize('gettingStarted.setup.OpenFolder.description.interpolated', "You're all set to start coding. Open a project folder to get your files into VS Code.\n{0}", Button(localize('pickFolder', "Pick a Folder"), 'command:workbench.action.files.openFolder')),
+-					when: '!config.chat.experimental.offerSetup && !isMac && workspaceFolderCount == 0',
++					id: 'codealloyChangelog',
++					title: localize('gettingStarted.codealloyChangelog.title', "Latest Changelog (v0.1.0-alpha.3)"),
++					description: localize('gettingStarted.codealloyChangelog.description', "Welcome to the initial developer preview of CodeAlloy! Key highlights in this release:\n\n• **Embedded AI Engine**: Full autonomous tool-calling loop, Agent Chat Webview, Model Selector, and Autonomy Dial bundled natively.\n• **Standalone CLI Launchers**: Run `alloy .` or `codealloy .` from your terminal to launch projects instantly.\n• **Universal macOS DMGs**: Fixed macOS Sonoma APFS compression by adopting standard HFS+ disk formatting with Apple ditto packaging.\n• **Shadow Git Time-Travel**: Sub-5ms pre-turn checkpoints and 1-click turn rollbacks.\n• **Native Inline Diffs**: Stream multi-line agent edits directly in the editor buffer with single-stroke accept (`Tab`) or discard (`Esc`).\n• **Open VSX Marketplace**: Preconfigured with Open VSX for 1-click extension installs.\n\n[View Full Changelog on GitHub](https://github.com/Heckle-and-Code/codealloy/blob/main/CHANGELOG.md)\n\n[Report an Issue / Give Feedback](https://github.com/Heckle-and-Code/codealloy/issues)"),
+ 					media: {
+-						type: 'svg', altText: 'Explorer view showing buttons for opening folder and cloning repository.', path: 'openFolder.svg'
++						type: 'svg',
++						altText: 'CodeAlloy Changelog',
++						path: 'extensions-web.svg'
+ 					}
+ 				},
+ 				{
+-					id: 'quickOpen',
+-					title: localize('gettingStarted.quickOpen.title', "Quickly navigate between your files"),
+-					description: localize('gettingStarted.quickOpen.description.interpolated', "Navigate between files in an instant with one keystroke. Tip: Open multiple files by pressing the right arrow key.\n{0}", Button(localize('quickOpen', "Quick Open a File"), 'command:toSide:workbench.action.quickOpen')),
+-					when: 'workspaceFolderCount != 0',
++					id: 'codealloyOpen',
++					title: localize('gettingStarted.codealloyOpen.title', "Open Your Code"),
++					description: localize('gettingStarted.codealloyOpen.description', "You're all set to start coding with CodeAlloy. Open a recent workspace or folder to begin.\n\n[Open Recent Folder...](command:workbench.action.openRecent)\n\n[Pick a Folder...](command:workbench.action.files.openFileFolder)"),
+ 					media: {
+-						type: 'svg', altText: 'Go to file in quick search.', path: 'search.svg'
++						type: 'svg',
++						altText: 'Open Folder',
++						path: 'openFolder.svg'
+ 					}
+-				},
+-				{
+-					id: 'videoTutorial',
+-					title: localize('gettingStarted.videoTutorial.title', "Watch video tutorials"),
+-					description: localize('gettingStarted.videoTutorial.description.interpolated', "Watch the first in a series of short & practical video tutorials for VS Code's key features.\n{0}", Button(localize('watch', "Watch Tutorial"), 'https://aka.ms/vscode-getting-started-video')),
+-					media: { type: 'svg', altText: 'VS Code Settings', path: 'learn.svg' },
+ 				}
+ 			]
+ 		}
