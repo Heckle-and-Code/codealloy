@@ -1,0 +1,61 @@
+name: Cleanup Older Releases
+
+on:
+  push:
+    paths:
+      - '.github/workflows/cleanup-releases.yml'
+      - '.github/consolidated_release_notes.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Delete Older Releases and Update Latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🧹 Deleting older broken releases..."
+          OLD_RELEASES=(383325125 383379866 383407082 383567588)
+          for id in "${OLD_RELEASES[@]}"; do
+            echo "Deleting release ID $id..."
+            curl -s -X DELETE \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/$id"
+          done
+          
+          echo "📝 Updating v0.1.0-alpha.6 with consolidated release notes..."
+          BODY=$(cat .github/consolidated_release_notes.md)
+          
+          node -e "
+            const https = require('https');
+            const fs = require('fs');
+            const body = fs.readFileSync('.github/consolidated_release_notes.md', 'utf8');
+            const data = JSON.stringify({ body: body });
+            
+            const req = https.request({
+              hostname: 'api.github.com',
+              path: '/repos/${{ github.repository }}/releases/383639977',
+              method: 'PATCH',
+              headers: {
+                'Authorization': 'token ' + process.env.GITHUB_TOKEN,
+                'User-Agent': 'cleanup-script',
+                'Accept': 'application/vnd.github.v3+json',
+                'Content-Type': 'application/json',
+                'Content-Length': Buffer.byteLength(data)
+              }
+            }, (res) => {
+              console.log('Update status:', res.statusCode);
+              res.pipe(process.stdout);
+            });
+            req.write(data);
+            req.end();
+          "
+          echo "✓ Completed cleanup and consolidation!"
